@@ -13,28 +13,7 @@ baremetal-ctl is a custom Kubernetes controller and gRPC API service that provis
 - Status reconciliation and lifecycle automation
 - Realistic simulation of bare-metal provisioning logic
 
----
-
-## Architecture
-
-+------------------------------+
-|   Kubernetes API Server     |
-+------------------------------+
-            |
-            v
-+------------------------------+
-|   baremetal-ctl Controller   | -- watches --> BareMetalNodeClaim
-+------------------------------+
-            |
-            v
-+------------------------------+
-|   gRPC Infra Provisioner    | -- handles --> Provision/Delete lifecycle
-+------------------------------+
-            |
-            v
-+------------------------------+
-|   Simulated Linux Infra     | (logs, fake nodes, status updates)
-+------------------------------+
+Kubernetes API Server --> baremetal-ctl Controller (watches BareMetalNodeClaim) --> gRPC Infra Provisioner (handles Provision/Delete lifecycle) --> Simulated Linux Infra (logs, fake nodes, status updates)
 
 ---
 
