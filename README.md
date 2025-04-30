@@ -5,7 +5,7 @@ Designed to simulate the infrastructure lifecycle challenges faced by modern GPU
 ---
 
 ## Overview
-baremetal-ctl is a custom Kubernetes controller and gRPC API service that provisions and manages Linux-based compute nodes declaratively through custom resources. It’s designed to reflect how platform teams manage physical infrastructure behind the scenes while presenting a clean, self-service experience to users.
+baremetal-ctl is a custom Kubernetes controller and gRPC API service that provisions and manages Linux-based compute nodes declaratively through custom resources. It’s designed to reflect how platform teams manage physical infrastructure behind the scenes while presenting a clean, self-service experience to users. This is the starting point in building a multi-tenant self-service GPU compute platform for AI workloads.
 
 - Go + Kubernetes controller development
 - gRPC infrastructure API design and implementation
@@ -27,7 +27,7 @@ Kubernetes API Server --> baremetal-ctl Controller (watches BareMetalNodeClaim) 
 - Status subresource updates and conditions
 - Local simulation of real infrastructure workflows
 - Prometheus metrics
-- TLS-secured gRPC (in progress)
+- TLS-secured gRPC
 
 ---
 
@@ -35,7 +35,7 @@ Kubernetes API Server --> baremetal-ctl Controller (watches BareMetalNodeClaim) 
 
 ### Custom Resource: BareMetalNodeClaim
 Users submit BareMetalNodeClaim resources:
-
+```
 apiVersion: infra.example.org/v1alpha1
 kind: BareMetalNodeClaim
 metadata:
@@ -46,15 +46,15 @@ spec:
   disk: "1Ti"
   osImage: "ubuntu-22.04"
   zone: "rack-az1"
-
+```
 This represents a request for compute infrastructure. The controller handles reconciliation and backend orchestration.
 
 ### gRPC API
 Provisioning is handled by an internal Go-based gRPC service:
-
+```
 rpc ProvisionNode(ProvisionRequest) returns (ProvisionResponse);
 rpc DeleteNode(DeleteRequest) returns (DeleteResponse);
-
+```
 This layer simulates node provisioning and emits structured events and metrics.
 
 ---
@@ -74,6 +74,7 @@ I built this project to simulate the type of internal infrastructure platforms u
 
 - Integration with libvirt or kubevirt for local VM provisioning
 - Expand CRD to support GPU scheduling, labels, taints
+- Cost-effective multi-cloud vendor support (i.e. Karpenter-based EKS Auto with EC2 Spot node group)
 - Add retries, TTLs, and lifecycle metrics
 - GitOps-style event recording for observability
 
