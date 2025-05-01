@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package hello.v1;
+
+option go_package = "baremetal-ctl/proto";
+
+message Person {
+    string name = 1;
+}
+
+// protoc --go_out=. --go_opt=paths=source_relative proto/hello.proto
