@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -23,8 +24,12 @@ func main() {
 
 	client := proto.NewHelloServiceClient(conn)
 	r, err := client.SayHello(ctx, &proto.SayHelloRequest{Name: "Charles"})
-	// gRPC error handling best practice is to handle the non-nil errors from RPC calls
+	// gRPC error handling best practice is to handle the non-nil errors from RPC calls client-side
 	if err != nil {
+		s, ok := status.FromError(err)
+		if ok {
+			log.Fatalf("status code: %s, error: %s", s.Code().String(), s.Message())
+		}
 		log.Fatal(err)
 	}
 	log.Println(r.Message)
