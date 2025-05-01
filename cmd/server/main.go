@@ -15,6 +15,7 @@ func main() {
 	// register gRPC service(s) on the server (RPCs automatically exposed)
 	proto.RegisterHelloServiceServer(server, new(hello.Service))
 	proto.RegisterTodoServiceServer(server, todo.NewService())
+
 	// 50051 is the standard port in gRPC
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
