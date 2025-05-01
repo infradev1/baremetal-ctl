@@ -8,4 +8,19 @@ message Person {
     string name = 1;
 }
 
-// protoc --go_out=. --go_opt=paths=source_relative proto/hello.proto
+// unary RPC
+service HelloService {
+    rpc SayHello(SayHelloRequest) returns (SayHelloResponse);
+}
+
+// separate request and response types for each rpc (best practice)
+
+message SayHelloRequest {
+    string name = 1;
+}
+
+message SayHelloResponse {
+    string message = 1;
+}
+
+// protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/hello.proto
