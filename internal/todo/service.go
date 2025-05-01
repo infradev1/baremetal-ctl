@@ -10,11 +10,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var todos = make(map[string]string)
-
 // must implement type TodoServiceServer interface public methods
 type Service struct {
-	proto.UnimplementedTodoServiceServer // default
+	proto.UnimplementedTodoServiceServer
+	tasks map[string]string
+}
+
+func NewService() *Service {
+	return &Service{tasks: make(map[string]string)}
 }
 
 func (s *Service) AddTask(ctx context.Context, req *proto.AddTaskRequest) (*proto.AddTaskResponse, error) {
@@ -22,7 +25,7 @@ func (s *Service) AddTask(ctx context.Context, req *proto.AddTaskRequest) (*prot
 		return nil, status.Error(codes.InvalidArgument, "task cannot be empty")
 	}
 	id := uuid.New().String()
-	todos[id] = req.GetTask()
+	s.tasks[id] = req.GetTask()
 
 	return &proto.AddTaskResponse{Id: id}, nil
 }
@@ -31,19 +34,19 @@ func (s *Service) CompleteTask(ctx context.Context, req *proto.CompleteTaskReque
 	if req.GetId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "task UUID cannot be empty")
 	}
-	if _, ok := todos[req.GetId()]; !ok {
+	if _, ok := s.tasks[req.GetId()]; !ok {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("task UUID %s not found", req.GetId()))
 	}
 
-	delete(todos, req.GetId())
+	delete(s.tasks, req.GetId())
 
 	return &proto.CompleteTaskResponse{}, nil
 }
 
 func (s *Service) ListTasks(ctx context.Context, req *proto.ListTasksRequest) (*proto.ListTasksResponse, error) {
-	tasks := make([]*proto.Task, 0, len(todos))
+	tasks := make([]*proto.Task, 0, len(s.tasks))
 
-	for id, task := range todos {
+	for id, task := range s.tasks {
 		tasks = append(tasks, &proto.Task{Id: id, Task: task})
 	}
 

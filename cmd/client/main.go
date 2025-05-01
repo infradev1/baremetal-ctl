@@ -23,8 +23,6 @@ func main() {
 	defer conn.Close()
 	// all RPC calls wait for conn.GetState() == connectivity.Ready
 
-	//client := proto.NewHelloServiceClient(conn)
-	//r, err := client.SayHello(ctx, &proto.SayHelloRequest{Name: "Charles"})
 	client := proto.NewTodoServiceClient(conn)
 
 	for i := range 20 {
