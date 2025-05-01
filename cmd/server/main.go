@@ -12,7 +12,7 @@ import (
 func main() {
 	server := grpc.NewServer()
 	svc := new(hello.Service)
-	// register service on the server (RPCs automatically exposed)
+	// register gRPC service on the server (RPCs automatically exposed)
 	proto.RegisterHelloServiceServer(server, svc)
 	// 50051 is the standard port in gRPC
 	lis, err := net.Listen("tcp", ":50051")
