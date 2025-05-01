@@ -1,16 +1,19 @@
 package main
 
 import (
+	"baremetal-ctl/internal/hello"
 	"baremetal-ctl/proto"
+	"context"
 	"log"
 )
 
 func main() {
-	p := proto.Person{
-		Name: "Charles",
+	svc := new(hello.Service)
+
+	r, err := svc.SayHello(context.TODO(), &proto.SayHelloRequest{Name: "Charles"})
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	log.Println(p.GetName())
-
-	//proto.HelloServiceServer.SayHello()
+	log.Println(r.Message)
 }
