@@ -2,6 +2,7 @@ package main
 
 import (
 	"baremetal-ctl/internal/hello"
+	"baremetal-ctl/internal/todo"
 	"baremetal-ctl/proto"
 	"log"
 	"net"
@@ -11,9 +12,9 @@ import (
 
 func main() {
 	server := grpc.NewServer()
-	svc := new(hello.Service)
-	// register gRPC service on the server (RPCs automatically exposed)
-	proto.RegisterHelloServiceServer(server, svc)
+	// register gRPC service(s) on the server (RPCs automatically exposed)
+	proto.RegisterHelloServiceServer(server, new(hello.Service))
+	proto.RegisterTodoServiceServer(server, new(todo.Service))
 	// 50051 is the standard port in gRPC
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
