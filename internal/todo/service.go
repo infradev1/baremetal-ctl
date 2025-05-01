@@ -21,7 +21,9 @@ type service struct {
 
 // NewService is the only way to construct a service object, keeping it private to this server package
 func NewService() *service {
-	return &service{tasks: make(map[string]string)}
+	return &service{
+		tasks: make(map[string]string),
+	}
 }
 
 func (s *service) AddTask(ctx context.Context, req *proto.AddTaskRequest) (*proto.AddTaskResponse, error) {
