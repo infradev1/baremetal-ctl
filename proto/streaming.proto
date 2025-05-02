@@ -7,7 +7,10 @@ option go_package = "baremetal-ctl/proto";
 import "google/protobuf/timestamp.proto";
 
 service StreamingService {
+    // server-side streaming
     rpc StreamServerTime(StreamServerTimeRequest) returns (stream StreamServerTimeResponse);
+    // client-side streaming
+    rpc LogStream(stream LogStreamRequest) returns (LogStreamResponse);
 }
 
 message StreamServerTimeRequest {
@@ -16,6 +19,25 @@ message StreamServerTimeRequest {
 
 message StreamServerTimeResponse {
     google.protobuf.Timestamp current_time = 1;
+}
+
+message LogStreamRequest {
+    google.protobuf.Timestamp timestamp = 1;
+    LogLevel level = 2;
+    string message = 3;
+}
+
+enum LogLevel {
+    LOG_LEVEL_UNSPECIFIED = 0;
+    LOG_LEVEL_DEBUG = 1;
+    LOG_LEVEL_INFO = 2;
+    LOG_LEVEL_WARNING = 3;
+    LOG_LEVEL_ERROR = 4;
+    LOG_LEVEL_FATAL = 5;
+}
+
+message LogStreamResponse {
+    int32 entries_logged = 1;
 }
 
 // protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/streaming.proto

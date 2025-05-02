@@ -3,6 +3,8 @@ package streaming
 import (
 	"baremetal-ctl/proto"
 	"fmt"
+	"io"
+	"log"
 	"time"
 
 	"google.golang.org/grpc"
@@ -37,5 +39,24 @@ func (s Service) StreamServerTime(req *proto.StreamServerTimeRequest, stream grp
 				return fmt.Errorf("error sending response message: %w", err)
 			}
 		}
+	}
+}
+
+func (s Service) LogStream(stream proto.StreamingService_LogStreamServer) error {
+	count := 0
+
+	for {
+		logReq, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF { // client closed the stream
+				return stream.SendAndClose(&proto.LogStreamResponse{
+					EntriesLogged: int32(count),
+				})
+			}
+			return err
+		}
+
+		log.Printf("received log [%s]: %s - %s", logReq.GetTimestamp().AsTime(), logReq.GetLevel().String(), logReq.GetMessage())
+		count++
 	}
 }
