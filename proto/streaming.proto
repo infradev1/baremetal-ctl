@@ -11,6 +11,8 @@ service StreamingService {
     rpc StreamServerTime(StreamServerTimeRequest) returns (stream StreamServerTimeResponse);
     // client-side streaming
     rpc LogStream(stream LogStreamRequest) returns (LogStreamResponse);
+    // bi-directional streaming
+    rpc Echo(stream EchoRequest) returns (stream EchoResponse);
 }
 
 message StreamServerTimeRequest {
@@ -38,6 +40,14 @@ enum LogLevel {
 
 message LogStreamResponse {
     int32 entries_logged = 1;
+}
+
+message EchoRequest {
+    string message = 1;
+}
+
+message EchoResponse {
+    string message = 1;
 }
 
 // protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/streaming.proto

@@ -272,6 +272,94 @@ func (x *LogStreamResponse) GetEntriesLogged() int32 {
 	return 0
 }
 
+type EchoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EchoRequest) Reset() {
+	*x = EchoRequest{}
+	mi := &file_proto_streaming_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EchoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EchoRequest) ProtoMessage() {}
+
+func (x *EchoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_streaming_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EchoRequest.ProtoReflect.Descriptor instead.
+func (*EchoRequest) Descriptor() ([]byte, []int) {
+	return file_proto_streaming_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *EchoRequest) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type EchoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EchoResponse) Reset() {
+	*x = EchoResponse{}
+	mi := &file_proto_streaming_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EchoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EchoResponse) ProtoMessage() {}
+
+func (x *EchoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_streaming_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EchoResponse.ProtoReflect.Descriptor instead.
+func (*EchoResponse) Descriptor() ([]byte, []int) {
+	return file_proto_streaming_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *EchoResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_proto_streaming_proto protoreflect.FileDescriptor
 
 const file_proto_streaming_proto_rawDesc = "" +
@@ -286,17 +374,22 @@ const file_proto_streaming_proto_rawDesc = "" +
 	"\x05level\x18\x02 \x01(\x0e2\x13.streaming.LogLevelR\x05level\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\":\n" +
 	"\x11LogStreamResponse\x12%\n" +
-	"\x0eentries_logged\x18\x01 \x01(\x05R\rentriesLogged*\x8f\x01\n" +
+	"\x0eentries_logged\x18\x01 \x01(\x05R\rentriesLogged\"'\n" +
+	"\vEchoRequest\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"(\n" +
+	"\fEchoResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage*\x8f\x01\n" +
 	"\bLogLevel\x12\x19\n" +
 	"\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fLOG_LEVEL_DEBUG\x10\x01\x12\x12\n" +
 	"\x0eLOG_LEVEL_INFO\x10\x02\x12\x15\n" +
 	"\x11LOG_LEVEL_WARNING\x10\x03\x12\x13\n" +
 	"\x0fLOG_LEVEL_ERROR\x10\x04\x12\x13\n" +
-	"\x0fLOG_LEVEL_FATAL\x10\x052\xbb\x01\n" +
+	"\x0fLOG_LEVEL_FATAL\x10\x052\xf8\x01\n" +
 	"\x10StreamingService\x12]\n" +
 	"\x10StreamServerTime\x12\".streaming.StreamServerTimeRequest\x1a#.streaming.StreamServerTimeResponse0\x01\x12H\n" +
-	"\tLogStream\x12\x1b.streaming.LogStreamRequest\x1a\x1c.streaming.LogStreamResponse(\x01B\x15Z\x13baremetal-ctl/protob\x06proto3"
+	"\tLogStream\x12\x1b.streaming.LogStreamRequest\x1a\x1c.streaming.LogStreamResponse(\x01\x12;\n" +
+	"\x04Echo\x12\x16.streaming.EchoRequest\x1a\x17.streaming.EchoResponse(\x010\x01B\x15Z\x13baremetal-ctl/protob\x06proto3"
 
 var (
 	file_proto_streaming_proto_rawDescOnce sync.Once
@@ -311,25 +404,29 @@ func file_proto_streaming_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_streaming_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_proto_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_proto_streaming_proto_goTypes = []any{
 	(LogLevel)(0),                    // 0: streaming.LogLevel
 	(*StreamServerTimeRequest)(nil),  // 1: streaming.StreamServerTimeRequest
 	(*StreamServerTimeResponse)(nil), // 2: streaming.StreamServerTimeResponse
 	(*LogStreamRequest)(nil),         // 3: streaming.LogStreamRequest
 	(*LogStreamResponse)(nil),        // 4: streaming.LogStreamResponse
-	(*timestamppb.Timestamp)(nil),    // 5: google.protobuf.Timestamp
+	(*EchoRequest)(nil),              // 5: streaming.EchoRequest
+	(*EchoResponse)(nil),             // 6: streaming.EchoResponse
+	(*timestamppb.Timestamp)(nil),    // 7: google.protobuf.Timestamp
 }
 var file_proto_streaming_proto_depIdxs = []int32{
-	5, // 0: streaming.StreamServerTimeResponse.current_time:type_name -> google.protobuf.Timestamp
-	5, // 1: streaming.LogStreamRequest.timestamp:type_name -> google.protobuf.Timestamp
+	7, // 0: streaming.StreamServerTimeResponse.current_time:type_name -> google.protobuf.Timestamp
+	7, // 1: streaming.LogStreamRequest.timestamp:type_name -> google.protobuf.Timestamp
 	0, // 2: streaming.LogStreamRequest.level:type_name -> streaming.LogLevel
 	1, // 3: streaming.StreamingService.StreamServerTime:input_type -> streaming.StreamServerTimeRequest
 	3, // 4: streaming.StreamingService.LogStream:input_type -> streaming.LogStreamRequest
-	2, // 5: streaming.StreamingService.StreamServerTime:output_type -> streaming.StreamServerTimeResponse
-	4, // 6: streaming.StreamingService.LogStream:output_type -> streaming.LogStreamResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
+	5, // 5: streaming.StreamingService.Echo:input_type -> streaming.EchoRequest
+	2, // 6: streaming.StreamingService.StreamServerTime:output_type -> streaming.StreamServerTimeResponse
+	4, // 7: streaming.StreamingService.LogStream:output_type -> streaming.LogStreamResponse
+	6, // 8: streaming.StreamingService.Echo:output_type -> streaming.EchoResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
 	3, // [3:3] is the sub-list for extension type_name
 	3, // [3:3] is the sub-list for extension extendee
 	0, // [0:3] is the sub-list for field type_name
@@ -346,7 +443,7 @@ func file_proto_streaming_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_streaming_proto_rawDesc), len(file_proto_streaming_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
