@@ -25,12 +25,12 @@ func main() {
 
 	client := proto.NewStreamingServiceClient(conn)
 
+	g, ctx := errgroup.WithContext(ctx)
+
 	stream, err := client.Echo(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	g, ctx := errgroup.WithContext(ctx)
 
 	// client goroutine
 	g.Go(func() error {
