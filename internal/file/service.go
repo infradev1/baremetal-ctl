@@ -1,9 +1,11 @@
 package file
 
 import (
+	"baremetal-ctl/internal"
 	"baremetal-ctl/proto"
 	"fmt"
 	"io"
+	"log"
 	"sync"
 
 	"github.com/google/uuid"
@@ -26,6 +28,7 @@ func NewService() *Service {
 
 func (s *Service) UploadFile(stream grpc.ClientStreamingServer[proto.UploadRequest, proto.UploadResponse]) error {
 	fn := fmt.Sprintf("%s.png", uuid.New().String())
+	bytes := 0
 
 	for {
 		req, err := stream.Recv()
@@ -36,6 +39,8 @@ func (s *Service) UploadFile(stream grpc.ClientStreamingServer[proto.UploadReque
 				}); err != nil {
 					return status.Error(codes.Internal, err.Error())
 				}
+
+				log.Printf("successfully uploaded %s to server: %d bytes", fn, bytes)
 				return nil
 			}
 			return status.Error(codes.Unknown, err.Error())
@@ -47,6 +52,8 @@ func (s *Service) UploadFile(stream grpc.ClientStreamingServer[proto.UploadReque
 		s.Lock()
 		s.files[fn] = append(s.files[fn], req.GetChunk()...)
 		s.Unlock()
+
+		bytes += len(req.GetChunk())
 	}
 }
 
@@ -61,7 +68,7 @@ func (s *Service) DownloadFile(req *proto.DownloadRequest, stream grpc.ServerStr
 	}
 
 	chunkSize := 5 * 1024 // 5 KB
-	chunks := splitIntoChunks(file, chunkSize)
+	chunks := internal.SplitIntoChunks(file, chunkSize)
 
 	for _, chunk := range chunks {
 		if err := stream.Send(&proto.DownloadResponse{Chunk: chunk}); err != nil {
@@ -70,15 +77,4 @@ func (s *Service) DownloadFile(req *proto.DownloadRequest, stream grpc.ServerStr
 	}
 
 	return nil
-}
-
-func splitIntoChunks(data []byte, chunkSize int) [][]byte {
-	var chunks [][]byte
-
-	for i := 0; i < len(data); i += chunkSize {
-		end := min(i+chunkSize, len(data))
-		chunks = append(chunks, data[i:end])
-	}
-
-	return chunks
 }
