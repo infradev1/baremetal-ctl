@@ -4,6 +4,7 @@ import (
 	"baremetal-ctl/internal"
 	"baremetal-ctl/proto"
 	"context"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -26,6 +27,14 @@ func main() {
 
 	//g, ctx := errgroup.WithContext(ctx)
 
+	fn := Upload(ctx, client)
+	log.Printf("successfully uploaded %s to server", fn)
+
+	n := Download(ctx, client, fn)
+	log.Printf("successfully downloaded %d bytes from server", n)
+}
+
+func Upload(ctx context.Context, client proto.FileManagerClient) string {
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -55,5 +64,27 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("successfully uploaded %s to server", res.GetFileName())
+	return res.GetFileName()
+}
+
+func Download(ctx context.Context, client proto.FileManagerClient, fn string) int {
+	stream, err := client.DownloadFile(ctx, &proto.DownloadRequest{FileName: fn})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data := make([]byte, 0)
+
+	for {
+		res, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF { // server closed stream
+				break
+			}
+			log.Fatal(err)
+		}
+		data = append(data, res.GetChunk()...)
+	}
+
+	return len(data)
 }
