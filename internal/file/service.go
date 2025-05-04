@@ -34,14 +34,9 @@ func (s *Service) UploadFile(stream grpc.ClientStreamingServer[proto.UploadReque
 		req, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF { // client closed stream
-				if err := stream.SendAndClose(&proto.UploadResponse{
-					FileName: fn,
-				}); err != nil {
-					return status.Error(codes.Internal, err.Error())
-				}
-
 				log.Printf("successfully uploaded %s to server: %d bytes", fn, bytes)
-				return nil
+
+				return stream.SendAndClose(&proto.UploadResponse{FileName: fn})
 			}
 			return status.Error(codes.Unknown, err.Error())
 		}
@@ -67,7 +62,7 @@ func (s *Service) DownloadFile(req *proto.DownloadRequest, stream grpc.ServerStr
 		return status.Error(codes.NotFound, fmt.Sprintf("file name %s not found", req.GetFileName()))
 	}
 
-	chunkSize := 5 * 1024 // 5 KB
+	const chunkSize = 5 * 1024 // 5 KB
 	chunks := internal.SplitIntoChunks(file, chunkSize)
 
 	for _, chunk := range chunks {

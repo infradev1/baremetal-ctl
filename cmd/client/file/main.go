@@ -25,8 +25,6 @@ func main() {
 
 	client := proto.NewFileManagerClient(conn)
 
-	//g, ctx := errgroup.WithContext(ctx)
-
 	fn := Upload(ctx, client)
 	log.Printf("successfully uploaded %s to server", fn)
 
