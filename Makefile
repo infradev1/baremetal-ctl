@@ -14,8 +14,8 @@ proto-gen:
 
 .PHONY: run-server
 run-server:
-	go run cmd/server/main.go
+	go run cmd/server/file/main.go
 
 .PHONY: run-client
 run-client:
-	go run cmd/client/main.go
+	go run cmd/client/file/main.go
