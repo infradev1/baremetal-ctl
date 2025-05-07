@@ -21,15 +21,17 @@ jobs:
     - name: Unit tests
       run: make test
 
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+    - name: Run gRPC Server (in background)
+      run: |
+        make run-server &  # Run server in background
+        SERVER_PID=$!               # Capture PID to kill later
+        sleep 3                     # Wait for server to start
+        echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV  # Store PID for cleanup
 
-    - name: Start gRPC server
-      run: make run-server
-
-    - name: Run gRPC client
+    - name: Run gRPC Client
       run: make run-client
+
+    - name: Stop gRPC Server
+      if: always()
+      run: |
+        kill $GITHUB_ENV
