@@ -1,4 +1,7 @@
 # baremetal-ctl
+
+[![CI](https://github.com/CarlosLaraFP/baremetal-ctl/actions/workflows/ci.yml/badge.svg)](https://github.com/CarlosLaraFP/baremetal-ctl/actions)
+
 A Kubernetes-native provisioning platform with a gRPC infrastructure API for managing bare-metal compute nodes at scale.
 Designed to simulate the infrastructure lifecycle challenges faced by modern GPU fleet operators like CoreWeave — built in Go using idiomatic controller-runtime patterns, gRPC, and CRDs.
 
