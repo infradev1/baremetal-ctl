@@ -23,3 +23,6 @@ run-client:
 clean:
 	go mod tidy
 	go mod vendor
+
+test:
+	go test ./... -v
