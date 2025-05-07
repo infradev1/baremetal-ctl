@@ -23,6 +23,4 @@ func main() {
 		slog.Error("error running application", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
-
-	slog.Info("closing server gracefully")
 }

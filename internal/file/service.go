@@ -5,7 +5,6 @@ import (
 	"baremetal-ctl/proto"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"sync"
 
@@ -35,7 +34,7 @@ func (s *Service) UploadFile(stream grpc.ClientStreamingServer[proto.UploadReque
 		req, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF { // client closed stream
-				log.Printf("successfully uploaded %s to server: %d bytes", fn, bytes)
+				slog.Info("successfully uploaded %s to server: %d bytes", fn, bytes)
 
 				return stream.SendAndClose(&proto.UploadResponse{FileName: fn})
 			}

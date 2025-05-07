@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 
+	prom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
@@ -32,10 +35,36 @@ func NewFileServer(svc proto.FileManagerServer) *FileServer {
 }
 
 func (fs *FileServer) Run(ctx context.Context) error {
+	// An interceptor is a function that wraps around the execution of an RPC.
+	// It's the gRPC-native mechanism to add cross-cutting concerns like:
+	// Authentication/authorization
+	// Logging
+	// Rate limiting
+	// Metrics
+	// Tracing
+	// Panic recovery
+	// In Go's gRPC world, interceptors are the middleware. Unlike HTTP frameworks (e.g. Chi, Echo)
+	// where "middleware" is stacked via chaining, here we hook into a fixed spot per call type.
 	server := grpc.NewServer(
-		grpc.StreamInterceptor(fs.RateLimitStreamInterceptor),
+		grpc.UnaryInterceptor(prom.UnaryServerInterceptor),
+		grpc.StreamInterceptor(fs.CompositeStreamInterceptor),
 	)
 	proto.RegisterFileManagerServer(server, fs.service)
+	// only registers internal gRPC metrics — it doesn't expose them (hooks into the gRPC server to collect metrics)
+	// Prometheus automatically tracks a variety of gRPC-level metrics, such as:
+	// grpc_server_started_total: Number of RPCs started on the server
+	// grpc_server_handled_total: Number of RPCs completed on the server
+	// grpc_server_msg_received_total: Number of stream messages received
+	// grpc_server_msg_sent_total: Number of stream messages sent
+	// grpc_server_handling_seconds_bucket: Histogram of RPC handling durations
+	prom.Register(server)
+	// expose Prometheus metrics
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	srv := &http.Server{
+		Addr:    ":9092",
+		Handler: mux,
+	}
 
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -56,9 +85,26 @@ func (fs *FileServer) Run(ctx context.Context) error {
 	})
 
 	g.Go(func() error {
+		slog.Info("starting Prometheus metrics endpoint", slog.String("address", srv.Addr))
+
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			return fmt.Errorf("metrics server error: %w", err)
+		}
+		return nil
+
+	})
+
+	g.Go(func() error {
 		// wait on the Done channel of the Context (blocks in its own goroutine)
 		<-ctx.Done()
 		// continues executing when the Context is cancelled
+
+		slog.Info("shutting down Prometheus metrics server")
+		if err := srv.Shutdown(context.Background()); err != nil {
+			slog.Warn("error shutting down metrics server", slog.String("error", err.Error()))
+		}
+
+		slog.Info("gracefully stopping gRPC server")
 		server.GracefulStop()
 
 		return nil
@@ -67,11 +113,11 @@ func (fs *FileServer) Run(ctx context.Context) error {
 	return g.Wait()
 }
 
-// RateLimitStreamInterceptor checks rate limits for streaming RPCs.
+// CompositeStreamInterceptor checks rate limits for streaming RPCs and sets up Prometheus.
 // Limits how many streams a client can open.
-func (fs *FileServer) RateLimitStreamInterceptor(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+func (fs *FileServer) CompositeStreamInterceptor(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	if !fs.limiter.Allow() {
 		return status.Errorf(codes.ResourceExhausted, "rate limit exceeded")
 	}
-	return handler(srv, ss)
+	return prom.StreamServerInterceptor(srv, ss, info, handler)
 }
