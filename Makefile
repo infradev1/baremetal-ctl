@@ -19,3 +19,7 @@ run-server:
 .PHONY: run-client
 run-client:
 	go run cmd/client/file/main.go
+
+clean:
+	go mod tidy
+	go mod vendor
