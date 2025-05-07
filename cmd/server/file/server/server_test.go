@@ -6,7 +6,6 @@ import (
 	"baremetal-ctl/proto"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -20,6 +19,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+var ctx context.Context
+var g *errgroup.Group
 
 func TestGlobalRateLimit(t *testing.T) {
 	go func() {
@@ -38,41 +40,10 @@ func TestGlobalRateLimit(t *testing.T) {
 		slog.Info("closing server gracefully")
 	}()
 
-	g, ctx := errgroup.WithContext(context.Background())
+	g, ctx = errgroup.WithContext(context.Background())
 
-	for i := range 10 { // global burst of 10 server-side
-		g.Go(func() error {
-			ctx, cancel := context.WithTimeout(ctx, time.Second*1)
-			defer cancel()
-
-			conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
-			if err != nil {
-				return err
-			}
-			defer conn.Close()
-
-			client := proto.NewFileManagerClient(conn)
-
-			dir, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-
-			path := filepath.Join(dir, "../../../../", "gopher.png")
-
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-
-			fn, err := Upload(ctx, client, data)
-			if err != nil {
-				return err
-			}
-
-			slog.Info(fmt.Sprintf("successfully uploaded %s to server", fn), slog.Int("goroutine", i))
-			return nil
-		})
+	for range 10 { // global burst of 10 server-side
+		g.Go(Upload)
 	}
 
 	if err := g.Wait(); err != nil {
@@ -81,39 +52,8 @@ func TestGlobalRateLimit(t *testing.T) {
 
 	slog.Info("first test passed")
 
-	for i := range 20 { // 100 RPS with 10 burst size (N - 10 will be spaced out in time by the server)
-		g.Go(func() error {
-			ctx, cancel := context.WithTimeout(ctx, time.Second*1) // context will timeout for post-burst requests
-			defer cancel()
-
-			conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
-			if err != nil {
-				return err
-			}
-			defer conn.Close()
-
-			client := proto.NewFileManagerClient(conn)
-
-			dir, err := os.Getwd()
-			if err != nil {
-				return err
-			}
-
-			path := filepath.Join(dir, "../../../../", "gopher.png")
-
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-
-			fn, err := Upload(ctx, client, data)
-			if err != nil {
-				return err
-			}
-
-			slog.Info(fn, slog.Int("goroutine", i))
-			return nil
-		})
+	for range 20 { // 100 RPS with 10 burst size (N - 10 will be spaced out in time by the server)
+		g.Go(Upload)
 	}
 
 	if err := g.Wait(); err == nil {
@@ -121,10 +61,33 @@ func TestGlobalRateLimit(t *testing.T) {
 	}
 }
 
-func Upload(ctx context.Context, client proto.FileManagerClient, file []byte) (string, error) {
+func Upload() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1) // context will timeout for post-burst requests
+	defer cancel()
+
+	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	client := proto.NewFileManagerClient(conn)
+
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(dir, "../../../../", "gopher.png")
+
+	file, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
 	stream, err := client.UploadFile(ctx)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	chunkSize := 5 * 1024 // 5 KB
@@ -132,14 +95,15 @@ func Upload(ctx context.Context, client proto.FileManagerClient, file []byte) (s
 
 	for _, chunk := range chunks {
 		if err := stream.Send(&proto.UploadRequest{Chunk: chunk}); err != nil {
-			return "", err
+			return err
 		}
 	}
 
-	res, err := stream.CloseAndRecv()
+	fn, err := stream.CloseAndRecv()
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return res.GetFileName(), nil
+	slog.Info(fn.GetFileName())
+	return nil
 }
