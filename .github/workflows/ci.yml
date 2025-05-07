@@ -34,4 +34,4 @@ jobs:
     - name: Stop gRPC Server
       if: always()
       run: |
-        kill $GITHUB_ENV
+        kill $SERVER_PID
