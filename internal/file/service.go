@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -48,6 +50,8 @@ func (s *Service) UploadFile(stream grpc.ClientStreamingServer[proto.UploadReque
 		s.files[fn] = append(s.files[fn], req.GetChunk()...)
 		s.Unlock()
 
+		slog.Info(fmt.Sprintf("uploaded %d bytes to server...", len(req.GetChunk())))
+		time.Sleep(1 * time.Second)
 		bytes += len(req.GetChunk())
 	}
 }

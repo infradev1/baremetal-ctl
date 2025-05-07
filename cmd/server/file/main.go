@@ -2,6 +2,7 @@ package main
 
 import (
 	"baremetal-ctl/cmd/server/file/server"
+	"baremetal-ctl/internal/file"
 	"context"
 	"errors"
 	"log/slog"
@@ -16,7 +17,7 @@ func main() {
 	)
 	defer cancel()
 
-	s := server.NewFileServer()
+	s := server.NewFileServer(file.NewService())
 
 	if err := s.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("error running application", slog.String("error", err.Error()))

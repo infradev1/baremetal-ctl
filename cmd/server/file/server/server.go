@@ -1,7 +1,6 @@
 package server
 
 import (
-	"baremetal-ctl/internal/file"
 	"baremetal-ctl/proto"
 	"context"
 	"fmt"
@@ -18,13 +17,17 @@ import (
 type FileServer struct {
 	address string
 	limiter *rate.Limiter
+	service proto.FileManagerServer
 }
 
-func NewFileServer() *FileServer {
+func NewFileServer(svc proto.FileManagerServer) *FileServer {
 	return &FileServer{
+		// Standard gRPC address
 		address: ":50051",
 		// Global rate limiter (100 requests/sec, burst of 10)
 		limiter: rate.NewLimiter(rate.Limit(100), 10),
+		// Dependencies
+		service: svc,
 	}
 }
 
@@ -32,8 +35,7 @@ func (fs *FileServer) Run(ctx context.Context) error {
 	server := grpc.NewServer(
 		grpc.StreamInterceptor(fs.RateLimitStreamInterceptor),
 	)
-	svc := file.NewService()
-	proto.RegisterFileManagerServer(server, svc)
+	proto.RegisterFileManagerServer(server, fs.service)
 
 	g, ctx := errgroup.WithContext(ctx)
 
