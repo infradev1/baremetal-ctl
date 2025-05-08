@@ -7,7 +7,9 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -17,12 +19,19 @@ import (
 )
 
 func TestUploadFile_Success(t *testing.T) {
-	go server.NewFileServer(NewService()).Start()
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGTERM,
+	)
 	defer cancel()
 
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	addr := make(chan string)
+
+	go server.NewFileServer(":0", NewService()).Start(ctx, addr)
+
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*20)
+	defer cancel()
+
+	conn, err := grpc.NewClient(<-addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}

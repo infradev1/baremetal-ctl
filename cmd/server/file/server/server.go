@@ -9,8 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 
 	prom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -27,10 +25,10 @@ type FileServer struct {
 	service proto.FileManagerServer
 }
 
-func NewFileServer(svc proto.FileManagerServer) *FileServer {
+func NewFileServer(addr string, svc proto.FileManagerServer) *FileServer {
 	return &FileServer{
-		// Standard gRPC address
-		address: ":50051",
+		// Standard gRPC address is :50051 (:0 binds to a free port)
+		address: addr,
 		// Global rate limiter (100 requests/sec, burst of 10)
 		limiter: rate.NewLimiter(rate.Limit(100), 10),
 		// Dependencies
@@ -38,13 +36,8 @@ func NewFileServer(svc proto.FileManagerServer) *FileServer {
 	}
 }
 
-func (fs *FileServer) Start() {
-	ctx, cancel := signal.NotifyContext(context.Background(),
-		os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGTERM,
-	)
-	defer cancel()
-
-	if err := fs.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+func (fs *FileServer) Start(ctx context.Context, ch chan<- string) {
+	if err := fs.Run(ctx, ch); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("error running application", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
@@ -52,7 +45,7 @@ func (fs *FileServer) Start() {
 	slog.Info("closing server gracefully")
 }
 
-func (fs *FileServer) Run(ctx context.Context) error {
+func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
 	// An interceptor is a function that wraps around the execution of an RPC.
 	// It's the gRPC-native mechanism to add cross-cutting concerns like:
 	// Authentication/authorization
@@ -92,7 +85,11 @@ func (fs *FileServer) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to listen on address %q: %w", fs.address, err)
 		}
 
-		slog.Info("starting gRPC server", slog.String("address", fs.address))
+		slog.Info("starting gRPC server", slog.String("address", lis.Addr().String()))
+		go func() {
+			// send-only channel (blocks until a receiver consumes)
+			ch <- lis.Addr().String()
+		}()
 
 		// blocking function (in a separate goroutine) starts the gRPC server
 		if err := server.Serve(lis); err != nil {

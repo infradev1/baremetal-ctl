@@ -7,7 +7,9 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -17,13 +19,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var ctx context.Context
-var g *errgroup.Group
+var address = make(chan string)
+var serverAddress string
 
 func TestGlobalRateLimit(t *testing.T) {
-	go NewFileServer(file.NewService()).Start()
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGTERM,
+	)
+	defer cancel()
 
-	g, ctx = errgroup.WithContext(context.Background())
+	go NewFileServer(":0", file.NewService()).Start(ctx, address)
+
+	serverAddress = <-address // read once
+
+	g, _ := errgroup.WithContext(context.Background())
 
 	for range 10 { // global burst of 10 server-side
 		g.Go(upload)
@@ -48,7 +57,7 @@ func upload() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1) // context will timeout for post-burst requests
 	defer cancel()
 
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(serverAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
