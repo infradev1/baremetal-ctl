@@ -5,12 +5,9 @@ import (
 	"baremetal-ctl/internal/file"
 	"baremetal-ctl/proto"
 	"context"
-	"errors"
 	"log/slog"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
@@ -24,21 +21,7 @@ var ctx context.Context
 var g *errgroup.Group
 
 func TestGlobalRateLimit(t *testing.T) {
-	go func() {
-		ctx, cancel := signal.NotifyContext(context.Background(),
-			os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGTERM,
-		)
-		defer cancel()
-
-		s := NewFileServer(file.NewService())
-
-		if err := s.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			slog.Error("error running application", slog.String("error", err.Error()))
-			os.Exit(1)
-		}
-
-		slog.Info("closing server gracefully")
-	}()
+	go NewFileServer(file.NewService()).Start()
 
 	g, ctx = errgroup.WithContext(context.Background())
 

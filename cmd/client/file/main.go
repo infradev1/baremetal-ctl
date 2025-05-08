@@ -34,6 +34,12 @@ func main() {
 	n := Download(ctx, client, fn)
 	log.Printf("successfully downloaded %d bytes from server", n)
 
+	res, err := client.SayHello(ctx, &proto.SayHelloRequest{Name: "Charles"})
+	if err != nil {
+		log.Fatal(err)
+	}
+	slog.Info(res.GetMessage())
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	stream, err := client.Echo(ctx)

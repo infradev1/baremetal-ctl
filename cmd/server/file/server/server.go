@@ -3,10 +3,14 @@ package server
 import (
 	"baremetal-ctl/proto"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	prom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -32,6 +36,20 @@ func NewFileServer(svc proto.FileManagerServer) *FileServer {
 		// Dependencies
 		service: svc,
 	}
+}
+
+func (fs *FileServer) Start() {
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGTERM,
+	)
+	defer cancel()
+
+	if err := fs.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		slog.Error("error running application", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	slog.Info("closing server gracefully")
 }
 
 func (fs *FileServer) Run(ctx context.Context) error {
