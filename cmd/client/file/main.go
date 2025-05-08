@@ -4,11 +4,14 @@ import (
 	"baremetal-ctl/internal"
 	"baremetal-ctl/proto"
 	"context"
+	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -30,6 +33,50 @@ func main() {
 
 	n := Download(ctx, client, fn)
 	log.Printf("successfully downloaded %d bytes from server", n)
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	stream, err := client.Echo(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// client goroutine
+	g.Go(func() error {
+		for i := range 10 {
+			if err := stream.Send(&proto.EchoRequest{
+				Message: fmt.Sprintf("message #%d", i),
+			}); err != nil {
+				return err
+			}
+		}
+
+		if err := stream.CloseSend(); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	// server goroutine
+	g.Go(func() error {
+		for {
+			res, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF { // server stream closed
+					break
+				}
+				return err
+			}
+			log.Println(res.GetMessage())
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Fatal(err)
+	}
+
+	slog.Info("bidirectional stream closed")
 }
 
 func Upload(ctx context.Context, client proto.FileManagerClient) string {

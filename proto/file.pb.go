@@ -9,6 +9,7 @@ package proto
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -20,6 +21,64 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+type LogLevel int32
+
+const (
+	LogLevel_LOG_LEVEL_UNSPECIFIED LogLevel = 0
+	LogLevel_LOG_LEVEL_DEBUG       LogLevel = 1
+	LogLevel_LOG_LEVEL_INFO        LogLevel = 2
+	LogLevel_LOG_LEVEL_WARNING     LogLevel = 3
+	LogLevel_LOG_LEVEL_ERROR       LogLevel = 4
+	LogLevel_LOG_LEVEL_FATAL       LogLevel = 5
+)
+
+// Enum value maps for LogLevel.
+var (
+	LogLevel_name = map[int32]string{
+		0: "LOG_LEVEL_UNSPECIFIED",
+		1: "LOG_LEVEL_DEBUG",
+		2: "LOG_LEVEL_INFO",
+		3: "LOG_LEVEL_WARNING",
+		4: "LOG_LEVEL_ERROR",
+		5: "LOG_LEVEL_FATAL",
+	}
+	LogLevel_value = map[string]int32{
+		"LOG_LEVEL_UNSPECIFIED": 0,
+		"LOG_LEVEL_DEBUG":       1,
+		"LOG_LEVEL_INFO":        2,
+		"LOG_LEVEL_WARNING":     3,
+		"LOG_LEVEL_ERROR":       4,
+		"LOG_LEVEL_FATAL":       5,
+	}
+)
+
+func (x LogLevel) Enum() *LogLevel {
+	p := new(LogLevel)
+	*p = x
+	return p
+}
+
+func (x LogLevel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LogLevel) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_file_proto_enumTypes[0].Descriptor()
+}
+
+func (LogLevel) Type() protoreflect.EnumType {
+	return &file_proto_file_proto_enumTypes[0]
+}
+
+func (x LogLevel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LogLevel.Descriptor instead.
+func (LogLevel) EnumDescriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{0}
+}
 
 type UploadRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -197,11 +256,291 @@ func (x *DownloadResponse) GetChunk() []byte {
 	return nil
 }
 
+type StreamServerTimeRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	IntervalSeconds int32                  `protobuf:"varint,1,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *StreamServerTimeRequest) Reset() {
+	*x = StreamServerTimeRequest{}
+	mi := &file_proto_file_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamServerTimeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamServerTimeRequest) ProtoMessage() {}
+
+func (x *StreamServerTimeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_file_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamServerTimeRequest.ProtoReflect.Descriptor instead.
+func (*StreamServerTimeRequest) Descriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *StreamServerTimeRequest) GetIntervalSeconds() int32 {
+	if x != nil {
+		return x.IntervalSeconds
+	}
+	return 0
+}
+
+type StreamServerTimeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CurrentTime   *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=current_time,json=currentTime,proto3" json:"current_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamServerTimeResponse) Reset() {
+	*x = StreamServerTimeResponse{}
+	mi := &file_proto_file_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamServerTimeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamServerTimeResponse) ProtoMessage() {}
+
+func (x *StreamServerTimeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_file_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamServerTimeResponse.ProtoReflect.Descriptor instead.
+func (*StreamServerTimeResponse) Descriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *StreamServerTimeResponse) GetCurrentTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CurrentTime
+	}
+	return nil
+}
+
+type LogStreamRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Level         LogLevel               `protobuf:"varint,2,opt,name=level,proto3,enum=file.LogLevel" json:"level,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogStreamRequest) Reset() {
+	*x = LogStreamRequest{}
+	mi := &file_proto_file_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogStreamRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogStreamRequest) ProtoMessage() {}
+
+func (x *LogStreamRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_file_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogStreamRequest.ProtoReflect.Descriptor instead.
+func (*LogStreamRequest) Descriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *LogStreamRequest) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
+func (x *LogStreamRequest) GetLevel() LogLevel {
+	if x != nil {
+		return x.Level
+	}
+	return LogLevel_LOG_LEVEL_UNSPECIFIED
+}
+
+func (x *LogStreamRequest) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type LogStreamResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EntriesLogged int32                  `protobuf:"varint,1,opt,name=entries_logged,json=entriesLogged,proto3" json:"entries_logged,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogStreamResponse) Reset() {
+	*x = LogStreamResponse{}
+	mi := &file_proto_file_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogStreamResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogStreamResponse) ProtoMessage() {}
+
+func (x *LogStreamResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_file_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogStreamResponse.ProtoReflect.Descriptor instead.
+func (*LogStreamResponse) Descriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *LogStreamResponse) GetEntriesLogged() int32 {
+	if x != nil {
+		return x.EntriesLogged
+	}
+	return 0
+}
+
+type EchoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EchoRequest) Reset() {
+	*x = EchoRequest{}
+	mi := &file_proto_file_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EchoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EchoRequest) ProtoMessage() {}
+
+func (x *EchoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_file_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EchoRequest.ProtoReflect.Descriptor instead.
+func (*EchoRequest) Descriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *EchoRequest) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type EchoResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EchoResponse) Reset() {
+	*x = EchoResponse{}
+	mi := &file_proto_file_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EchoResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EchoResponse) ProtoMessage() {}
+
+func (x *EchoResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_file_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EchoResponse.ProtoReflect.Descriptor instead.
+func (*EchoResponse) Descriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *EchoResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_proto_file_proto protoreflect.FileDescriptor
 
 const file_proto_file_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/file.proto\x12\x04file\"%\n" +
+	"\x10proto/file.proto\x12\x04file\x1a\x1fgoogle/protobuf/timestamp.proto\"%\n" +
 	"\rUploadRequest\x12\x14\n" +
 	"\x05chunk\x18\x01 \x01(\fR\x05chunk\"-\n" +
 	"\x0eUploadResponse\x12\x1b\n" +
@@ -209,11 +548,33 @@ const file_proto_file_proto_rawDesc = "" +
 	"\x0fDownloadRequest\x12\x1b\n" +
 	"\tfile_name\x18\x01 \x01(\tR\bfileName\"(\n" +
 	"\x10DownloadResponse\x12\x14\n" +
-	"\x05chunk\x18\x01 \x01(\fR\x05chunk2\x89\x01\n" +
+	"\x05chunk\x18\x01 \x01(\fR\x05chunk\"D\n" +
+	"\x17StreamServerTimeRequest\x12)\n" +
+	"\x10interval_seconds\x18\x01 \x01(\x05R\x0fintervalSeconds\"Y\n" +
+	"\x18StreamServerTimeResponse\x12=\n" +
+	"\fcurrent_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\vcurrentTime\"\x8c\x01\n" +
+	"\x10LogStreamRequest\x128\n" +
+	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12$\n" +
+	"\x05level\x18\x02 \x01(\x0e2\x0e.file.LogLevelR\x05level\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\":\n" +
+	"\x11LogStreamResponse\x12%\n" +
+	"\x0eentries_logged\x18\x01 \x01(\x05R\rentriesLogged\"'\n" +
+	"\vEchoRequest\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"(\n" +
+	"\fEchoResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage*\x8f\x01\n" +
+	"\bLogLevel\x12\x19\n" +
+	"\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fLOG_LEVEL_DEBUG\x10\x01\x12\x12\n" +
+	"\x0eLOG_LEVEL_INFO\x10\x02\x12\x15\n" +
+	"\x11LOG_LEVEL_WARNING\x10\x03\x12\x13\n" +
+	"\x0fLOG_LEVEL_ERROR\x10\x04\x12\x13\n" +
+	"\x0fLOG_LEVEL_FATAL\x10\x052\xbc\x01\n" +
 	"\vFileManager\x129\n" +
 	"\n" +
 	"UploadFile\x12\x13.file.UploadRequest\x1a\x14.file.UploadResponse(\x01\x12?\n" +
-	"\fDownloadFile\x12\x15.file.DownloadRequest\x1a\x16.file.DownloadResponse0\x01B\x15Z\x13baremetal-ctl/protob\x06proto3"
+	"\fDownloadFile\x12\x15.file.DownloadRequest\x1a\x16.file.DownloadResponse0\x01\x121\n" +
+	"\x04Echo\x12\x11.file.EchoRequest\x1a\x12.file.EchoResponse(\x010\x01B\x15Z\x13baremetal-ctl/protob\x06proto3"
 
 var (
 	file_proto_file_proto_rawDescOnce sync.Once
@@ -227,23 +588,37 @@ func file_proto_file_proto_rawDescGZIP() []byte {
 	return file_proto_file_proto_rawDescData
 }
 
-var file_proto_file_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_proto_file_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_file_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_proto_file_proto_goTypes = []any{
-	(*UploadRequest)(nil),    // 0: file.UploadRequest
-	(*UploadResponse)(nil),   // 1: file.UploadResponse
-	(*DownloadRequest)(nil),  // 2: file.DownloadRequest
-	(*DownloadResponse)(nil), // 3: file.DownloadResponse
+	(LogLevel)(0),                    // 0: file.LogLevel
+	(*UploadRequest)(nil),            // 1: file.UploadRequest
+	(*UploadResponse)(nil),           // 2: file.UploadResponse
+	(*DownloadRequest)(nil),          // 3: file.DownloadRequest
+	(*DownloadResponse)(nil),         // 4: file.DownloadResponse
+	(*StreamServerTimeRequest)(nil),  // 5: file.StreamServerTimeRequest
+	(*StreamServerTimeResponse)(nil), // 6: file.StreamServerTimeResponse
+	(*LogStreamRequest)(nil),         // 7: file.LogStreamRequest
+	(*LogStreamResponse)(nil),        // 8: file.LogStreamResponse
+	(*EchoRequest)(nil),              // 9: file.EchoRequest
+	(*EchoResponse)(nil),             // 10: file.EchoResponse
+	(*timestamppb.Timestamp)(nil),    // 11: google.protobuf.Timestamp
 }
 var file_proto_file_proto_depIdxs = []int32{
-	0, // 0: file.FileManager.UploadFile:input_type -> file.UploadRequest
-	2, // 1: file.FileManager.DownloadFile:input_type -> file.DownloadRequest
-	1, // 2: file.FileManager.UploadFile:output_type -> file.UploadResponse
-	3, // 3: file.FileManager.DownloadFile:output_type -> file.DownloadResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	11, // 0: file.StreamServerTimeResponse.current_time:type_name -> google.protobuf.Timestamp
+	11, // 1: file.LogStreamRequest.timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 2: file.LogStreamRequest.level:type_name -> file.LogLevel
+	1,  // 3: file.FileManager.UploadFile:input_type -> file.UploadRequest
+	3,  // 4: file.FileManager.DownloadFile:input_type -> file.DownloadRequest
+	9,  // 5: file.FileManager.Echo:input_type -> file.EchoRequest
+	2,  // 6: file.FileManager.UploadFile:output_type -> file.UploadResponse
+	4,  // 7: file.FileManager.DownloadFile:output_type -> file.DownloadResponse
+	10, // 8: file.FileManager.Echo:output_type -> file.EchoResponse
+	6,  // [6:9] is the sub-list for method output_type
+	3,  // [3:6] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_proto_file_proto_init() }
@@ -256,13 +631,14 @@ func file_proto_file_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_file_proto_rawDesc), len(file_proto_file_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      1,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_proto_file_proto_goTypes,
 		DependencyIndexes: file_proto_file_proto_depIdxs,
+		EnumInfos:         file_proto_file_proto_enumTypes,
 		MessageInfos:      file_proto_file_proto_msgTypes,
 	}.Build()
 	File_proto_file_proto = out.File

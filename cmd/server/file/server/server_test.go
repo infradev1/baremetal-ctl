@@ -43,7 +43,7 @@ func TestGlobalRateLimit(t *testing.T) {
 	g, ctx = errgroup.WithContext(context.Background())
 
 	for range 10 { // global burst of 10 server-side
-		g.Go(Upload)
+		g.Go(upload)
 	}
 
 	if err := g.Wait(); err != nil {
@@ -53,7 +53,7 @@ func TestGlobalRateLimit(t *testing.T) {
 	slog.Info("first test passed")
 
 	for range 20 { // 100 RPS with 10 burst size (N - 10 will be spaced out in time by the server)
-		g.Go(Upload)
+		g.Go(upload)
 	}
 
 	if err := g.Wait(); err == nil {
@@ -61,7 +61,7 @@ func TestGlobalRateLimit(t *testing.T) {
 	}
 }
 
-func Upload() error {
+func upload() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1) // context will timeout for post-burst requests
 	defer cancel()
 

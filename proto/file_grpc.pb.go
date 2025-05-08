@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	FileManager_UploadFile_FullMethodName   = "/file.FileManager/UploadFile"
 	FileManager_DownloadFile_FullMethodName = "/file.FileManager/DownloadFile"
+	FileManager_Echo_FullMethodName         = "/file.FileManager/Echo"
 )
 
 // FileManagerClient is the client API for FileManager service.
@@ -29,6 +30,8 @@ const (
 type FileManagerClient interface {
 	UploadFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadRequest, UploadResponse], error)
 	DownloadFile(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadResponse], error)
+	// bi-directional streaming
+	Echo(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[EchoRequest, EchoResponse], error)
 }
 
 type fileManagerClient struct {
@@ -71,12 +74,27 @@ func (c *fileManagerClient) DownloadFile(ctx context.Context, in *DownloadReques
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FileManager_DownloadFileClient = grpc.ServerStreamingClient[DownloadResponse]
 
+func (c *fileManagerClient) Echo(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[EchoRequest, EchoResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &FileManager_ServiceDesc.Streams[2], FileManager_Echo_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[EchoRequest, EchoResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type FileManager_EchoClient = grpc.BidiStreamingClient[EchoRequest, EchoResponse]
+
 // FileManagerServer is the server API for FileManager service.
 // All implementations must embed UnimplementedFileManagerServer
 // for forward compatibility.
 type FileManagerServer interface {
 	UploadFile(grpc.ClientStreamingServer[UploadRequest, UploadResponse]) error
 	DownloadFile(*DownloadRequest, grpc.ServerStreamingServer[DownloadResponse]) error
+	// bi-directional streaming
+	Echo(grpc.BidiStreamingServer[EchoRequest, EchoResponse]) error
 	mustEmbedUnimplementedFileManagerServer()
 }
 
@@ -92,6 +110,9 @@ func (UnimplementedFileManagerServer) UploadFile(grpc.ClientStreamingServer[Uplo
 }
 func (UnimplementedFileManagerServer) DownloadFile(*DownloadRequest, grpc.ServerStreamingServer[DownloadResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadFile not implemented")
+}
+func (UnimplementedFileManagerServer) Echo(grpc.BidiStreamingServer[EchoRequest, EchoResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method Echo not implemented")
 }
 func (UnimplementedFileManagerServer) mustEmbedUnimplementedFileManagerServer() {}
 func (UnimplementedFileManagerServer) testEmbeddedByValue()                     {}
@@ -132,6 +153,13 @@ func _FileManager_DownloadFile_Handler(srv interface{}, stream grpc.ServerStream
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FileManager_DownloadFileServer = grpc.ServerStreamingServer[DownloadResponse]
 
+func _FileManager_Echo_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(FileManagerServer).Echo(&grpc.GenericServerStream[EchoRequest, EchoResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type FileManager_EchoServer = grpc.BidiStreamingServer[EchoRequest, EchoResponse]
+
 // FileManager_ServiceDesc is the grpc.ServiceDesc for FileManager service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -149,6 +177,12 @@ var FileManager_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "DownloadFile",
 			Handler:       _FileManager_DownloadFile_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "Echo",
+			Handler:       _FileManager_Echo_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "proto/file.proto",

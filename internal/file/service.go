@@ -75,3 +75,21 @@ func (s *Service) DownloadFile(req *proto.DownloadRequest, stream grpc.ServerStr
 
 	return nil
 }
+
+func (s *Service) Echo(stream grpc.BidiStreamingServer[proto.EchoRequest, proto.EchoResponse]) error {
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF { // client closed the stream
+				return nil // close server stream
+			}
+			return err
+		}
+
+		slog.Info("echoing", slog.String("message", req.GetMessage()))
+
+		if err := stream.Send(&proto.EchoResponse{Message: req.GetMessage()}); err != nil {
+			return err
+		}
+	}
+}
