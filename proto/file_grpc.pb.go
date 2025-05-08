@@ -22,6 +22,7 @@ const (
 	FileManager_UploadFile_FullMethodName   = "/file.FileManager/UploadFile"
 	FileManager_DownloadFile_FullMethodName = "/file.FileManager/DownloadFile"
 	FileManager_Echo_FullMethodName         = "/file.FileManager/Echo"
+	FileManager_SayHello_FullMethodName     = "/file.FileManager/SayHello"
 )
 
 // FileManagerClient is the client API for FileManager service.
@@ -30,8 +31,8 @@ const (
 type FileManagerClient interface {
 	UploadFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadRequest, UploadResponse], error)
 	DownloadFile(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadResponse], error)
-	// bi-directional streaming
 	Echo(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[EchoRequest, EchoResponse], error)
+	SayHello(ctx context.Context, in *SayHelloRequest, opts ...grpc.CallOption) (*SayHelloResponse, error)
 }
 
 type fileManagerClient struct {
@@ -87,14 +88,24 @@ func (c *fileManagerClient) Echo(ctx context.Context, opts ...grpc.CallOption) (
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FileManager_EchoClient = grpc.BidiStreamingClient[EchoRequest, EchoResponse]
 
+func (c *fileManagerClient) SayHello(ctx context.Context, in *SayHelloRequest, opts ...grpc.CallOption) (*SayHelloResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SayHelloResponse)
+	err := c.cc.Invoke(ctx, FileManager_SayHello_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FileManagerServer is the server API for FileManager service.
 // All implementations must embed UnimplementedFileManagerServer
 // for forward compatibility.
 type FileManagerServer interface {
 	UploadFile(grpc.ClientStreamingServer[UploadRequest, UploadResponse]) error
 	DownloadFile(*DownloadRequest, grpc.ServerStreamingServer[DownloadResponse]) error
-	// bi-directional streaming
 	Echo(grpc.BidiStreamingServer[EchoRequest, EchoResponse]) error
+	SayHello(context.Context, *SayHelloRequest) (*SayHelloResponse, error)
 	mustEmbedUnimplementedFileManagerServer()
 }
 
@@ -113,6 +124,9 @@ func (UnimplementedFileManagerServer) DownloadFile(*DownloadRequest, grpc.Server
 }
 func (UnimplementedFileManagerServer) Echo(grpc.BidiStreamingServer[EchoRequest, EchoResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Echo not implemented")
+}
+func (UnimplementedFileManagerServer) SayHello(context.Context, *SayHelloRequest) (*SayHelloResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SayHello not implemented")
 }
 func (UnimplementedFileManagerServer) mustEmbedUnimplementedFileManagerServer() {}
 func (UnimplementedFileManagerServer) testEmbeddedByValue()                     {}
@@ -160,13 +174,36 @@ func _FileManager_Echo_Handler(srv interface{}, stream grpc.ServerStream) error 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FileManager_EchoServer = grpc.BidiStreamingServer[EchoRequest, EchoResponse]
 
+func _FileManager_SayHello_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SayHelloRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileManagerServer).SayHello(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FileManager_SayHello_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileManagerServer).SayHello(ctx, req.(*SayHelloRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FileManager_ServiceDesc is the grpc.ServiceDesc for FileManager service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var FileManager_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "file.FileManager",
 	HandlerType: (*FileManagerServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "SayHello",
+			Handler:    _FileManager_SayHello_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "UploadFile",

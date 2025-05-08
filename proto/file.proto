@@ -9,8 +9,8 @@ import "google/protobuf/timestamp.proto";
 service FileManager {
     rpc UploadFile(stream UploadRequest) returns (UploadResponse);
     rpc DownloadFile(DownloadRequest) returns (stream DownloadResponse);
-    // bi-directional streaming
     rpc Echo(stream EchoRequest) returns (stream EchoResponse);
+    rpc SayHello(SayHelloRequest) returns (SayHelloResponse);
 }
 
 message UploadRequest {
@@ -61,6 +61,14 @@ message EchoRequest {
 }
 
 message EchoResponse {
+    string message = 1;
+}
+
+message SayHelloRequest {
+    string name = 1;
+}
+
+message SayHelloResponse {
     string message = 1;
 }
 

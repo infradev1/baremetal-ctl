@@ -1,7 +1,6 @@
 package main
 
 import (
-	"baremetal-ctl/internal/hello"
 	"baremetal-ctl/internal/todo"
 	"baremetal-ctl/proto"
 	"context"
@@ -35,7 +34,6 @@ func main() {
 func run(ctx context.Context) error {
 	server := grpc.NewServer()
 	// register gRPC service(s) on the server (RPCs automatically exposed)
-	proto.RegisterHelloServiceServer(server, new(hello.Service))
 	proto.RegisterTodoServiceServer(server, todo.NewService())
 
 	g, ctx := errgroup.WithContext(ctx)

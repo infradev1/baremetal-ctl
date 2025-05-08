@@ -536,6 +536,94 @@ func (x *EchoResponse) GetMessage() string {
 	return ""
 }
 
+type SayHelloRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SayHelloRequest) Reset() {
+	*x = SayHelloRequest{}
+	mi := &file_proto_file_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SayHelloRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SayHelloRequest) ProtoMessage() {}
+
+func (x *SayHelloRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_file_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SayHelloRequest.ProtoReflect.Descriptor instead.
+func (*SayHelloRequest) Descriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SayHelloRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type SayHelloResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SayHelloResponse) Reset() {
+	*x = SayHelloResponse{}
+	mi := &file_proto_file_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SayHelloResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SayHelloResponse) ProtoMessage() {}
+
+func (x *SayHelloResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_file_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SayHelloResponse.ProtoReflect.Descriptor instead.
+func (*SayHelloResponse) Descriptor() ([]byte, []int) {
+	return file_proto_file_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SayHelloResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_proto_file_proto protoreflect.FileDescriptor
 
 const file_proto_file_proto_rawDesc = "" +
@@ -562,6 +650,10 @@ const file_proto_file_proto_rawDesc = "" +
 	"\vEchoRequest\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\"(\n" +
 	"\fEchoResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"%\n" +
+	"\x0fSayHelloRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\",\n" +
+	"\x10SayHelloResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage*\x8f\x01\n" +
 	"\bLogLevel\x12\x19\n" +
 	"\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\x13\n" +
@@ -569,12 +661,13 @@ const file_proto_file_proto_rawDesc = "" +
 	"\x0eLOG_LEVEL_INFO\x10\x02\x12\x15\n" +
 	"\x11LOG_LEVEL_WARNING\x10\x03\x12\x13\n" +
 	"\x0fLOG_LEVEL_ERROR\x10\x04\x12\x13\n" +
-	"\x0fLOG_LEVEL_FATAL\x10\x052\xbc\x01\n" +
+	"\x0fLOG_LEVEL_FATAL\x10\x052\xf7\x01\n" +
 	"\vFileManager\x129\n" +
 	"\n" +
 	"UploadFile\x12\x13.file.UploadRequest\x1a\x14.file.UploadResponse(\x01\x12?\n" +
 	"\fDownloadFile\x12\x15.file.DownloadRequest\x1a\x16.file.DownloadResponse0\x01\x121\n" +
-	"\x04Echo\x12\x11.file.EchoRequest\x1a\x12.file.EchoResponse(\x010\x01B\x15Z\x13baremetal-ctl/protob\x06proto3"
+	"\x04Echo\x12\x11.file.EchoRequest\x1a\x12.file.EchoResponse(\x010\x01\x129\n" +
+	"\bSayHello\x12\x15.file.SayHelloRequest\x1a\x16.file.SayHelloResponseB\x15Z\x13baremetal-ctl/protob\x06proto3"
 
 var (
 	file_proto_file_proto_rawDescOnce sync.Once
@@ -589,7 +682,7 @@ func file_proto_file_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_file_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_file_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_proto_file_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_proto_file_proto_goTypes = []any{
 	(LogLevel)(0),                    // 0: file.LogLevel
 	(*UploadRequest)(nil),            // 1: file.UploadRequest
@@ -602,20 +695,24 @@ var file_proto_file_proto_goTypes = []any{
 	(*LogStreamResponse)(nil),        // 8: file.LogStreamResponse
 	(*EchoRequest)(nil),              // 9: file.EchoRequest
 	(*EchoResponse)(nil),             // 10: file.EchoResponse
-	(*timestamppb.Timestamp)(nil),    // 11: google.protobuf.Timestamp
+	(*SayHelloRequest)(nil),          // 11: file.SayHelloRequest
+	(*SayHelloResponse)(nil),         // 12: file.SayHelloResponse
+	(*timestamppb.Timestamp)(nil),    // 13: google.protobuf.Timestamp
 }
 var file_proto_file_proto_depIdxs = []int32{
-	11, // 0: file.StreamServerTimeResponse.current_time:type_name -> google.protobuf.Timestamp
-	11, // 1: file.LogStreamRequest.timestamp:type_name -> google.protobuf.Timestamp
+	13, // 0: file.StreamServerTimeResponse.current_time:type_name -> google.protobuf.Timestamp
+	13, // 1: file.LogStreamRequest.timestamp:type_name -> google.protobuf.Timestamp
 	0,  // 2: file.LogStreamRequest.level:type_name -> file.LogLevel
 	1,  // 3: file.FileManager.UploadFile:input_type -> file.UploadRequest
 	3,  // 4: file.FileManager.DownloadFile:input_type -> file.DownloadRequest
 	9,  // 5: file.FileManager.Echo:input_type -> file.EchoRequest
-	2,  // 6: file.FileManager.UploadFile:output_type -> file.UploadResponse
-	4,  // 7: file.FileManager.DownloadFile:output_type -> file.DownloadResponse
-	10, // 8: file.FileManager.Echo:output_type -> file.EchoResponse
-	6,  // [6:9] is the sub-list for method output_type
-	3,  // [3:6] is the sub-list for method input_type
+	11, // 6: file.FileManager.SayHello:input_type -> file.SayHelloRequest
+	2,  // 7: file.FileManager.UploadFile:output_type -> file.UploadResponse
+	4,  // 8: file.FileManager.DownloadFile:output_type -> file.DownloadResponse
+	10, // 9: file.FileManager.Echo:output_type -> file.EchoResponse
+	12, // 10: file.FileManager.SayHello:output_type -> file.SayHelloResponse
+	7,  // [7:11] is the sub-list for method output_type
+	3,  // [3:7] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
 	3,  // [3:3] is the sub-list for extension extendee
 	0,  // [0:3] is the sub-list for field type_name
@@ -632,7 +729,7 @@ func file_proto_file_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_file_proto_rawDesc), len(file_proto_file_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

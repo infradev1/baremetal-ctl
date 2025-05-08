@@ -3,6 +3,7 @@ package file
 import (
 	"baremetal-ctl/internal"
 	"baremetal-ctl/proto"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,6 +27,7 @@ func NewService() *Service {
 	return svc
 }
 
+// client-side streaming RPC
 func (s *Service) UploadFile(stream grpc.ClientStreamingServer[proto.UploadRequest, proto.UploadResponse]) error {
 	fn := fmt.Sprintf("%s.png", uuid.New().String())
 	bytes := 0
@@ -54,6 +56,7 @@ func (s *Service) UploadFile(stream grpc.ClientStreamingServer[proto.UploadReque
 	}
 }
 
+// server-side streaming RPC
 func (s *Service) DownloadFile(req *proto.DownloadRequest, stream grpc.ServerStreamingServer[proto.DownloadResponse]) error {
 	if req.GetFileName() == "" {
 		return status.Error(codes.InvalidArgument, "file name must be provided")
@@ -76,6 +79,7 @@ func (s *Service) DownloadFile(req *proto.DownloadRequest, stream grpc.ServerStr
 	return nil
 }
 
+// bidirectional streaming RPC
 func (s *Service) Echo(stream grpc.BidiStreamingServer[proto.EchoRequest, proto.EchoResponse]) error {
 	for {
 		req, err := stream.Recv()
@@ -92,4 +96,14 @@ func (s *Service) Echo(stream grpc.BidiStreamingServer[proto.EchoRequest, proto.
 			return err
 		}
 	}
+}
+
+// unary RPC (context use enforced)
+func (s *Service) SayHello(ctx context.Context, r *proto.SayHelloRequest) (*proto.SayHelloResponse, error) {
+	if r.GetName() == "" {
+		// errors.New("...") also possible for less error handling client side
+		return nil, status.Error(codes.InvalidArgument, "name cannot be empty")
+	}
+
+	return &proto.SayHelloResponse{Message: fmt.Sprintf("Hello %s!", r.GetName())}, nil
 }
