@@ -37,7 +37,7 @@ func TestUploadFile_Success(t *testing.T) {
 
 	conn, err := grpc.NewClient(<-address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatal(err)
+		assert.FailNow(t, err.Error())
 	}
 	defer conn.Close()
 
@@ -45,20 +45,20 @@ func TestUploadFile_Success(t *testing.T) {
 
 	stream, err := client.UploadFile(ctx)
 	if err != nil {
-		log.Fatal(err)
+		assert.FailNow(t, err.Error())
 	}
 
 	chunks := internal.SplitIntoChunks(loadData(), chunkSize)
 
 	for _, chunk := range chunks {
 		if err := stream.Send(&proto.UploadRequest{Chunk: chunk}); err != nil {
-			log.Fatal(err)
+			assert.FailNow(t, err.Error())
 		}
 	}
 
 	res, err := stream.CloseAndRecv()
 	if err != nil {
-		log.Fatal(err)
+		assert.FailNow(t, err.Error())
 	}
 
 	assert.NotEmpty(t, res.GetFileName())
@@ -77,7 +77,7 @@ func TestUploadFile_Failure(t *testing.T) {
 
 	conn, err := grpc.NewClient(<-address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatal(err)
+		assert.FailNow(t, err.Error())
 	}
 	defer conn.Close()
 
@@ -85,11 +85,14 @@ func TestUploadFile_Failure(t *testing.T) {
 
 	stream, err := client.UploadFile(ctx)
 	if err != nil {
-		log.Fatal(err)
+		assert.FailNow(t, err.Error())
 	}
 
 	empty := make([]byte, 0)
-	_ = stream.Send(&proto.UploadRequest{Chunk: empty})
+	err = stream.Send(&proto.UploadRequest{Chunk: empty})
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
 
 	_, err = stream.CloseAndRecv()
 	if err != nil {
