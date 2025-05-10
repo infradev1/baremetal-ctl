@@ -39,8 +39,8 @@ func NewFileServer(addr string, svc proto.FileManagerServer) *FileServer {
 	}
 }
 
-func (fs *FileServer) Start(ctx context.Context, ch chan<- string) {
-	if err := fs.Run(ctx, ch); err != nil && !errors.Is(err, context.Canceled) {
+func (fs *FileServer) Start(ctx context.Context, ch chan<- string, secure bool) {
+	if err := fs.Run(ctx, ch, secure); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("error running application", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
@@ -48,50 +48,56 @@ func (fs *FileServer) Start(ctx context.Context, ch chan<- string) {
 	slog.Info("closing server gracefully")
 }
 
-func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
+func (fs *FileServer) Run(ctx context.Context, ch chan<- string, secure bool) error {
 	// TLS
 	//tls, err := credentials.NewServerTLSFromFile("certs/server.crt", "certs/server.key")
-	//if err != nil {
-	//	// %w wraps the error such that it can later be unwrapped with errors.Unwrap, and so that it can be considered with errors.Is and errors.As
-	//	return fmt.Errorf("failed to load TLS credentials: %w", err)
-	//}
 
-	serverCert, err := tls.LoadX509KeyPair("certs/server.crt", "certs/server.key")
-	if err != nil {
-		return fmt.Errorf("failed to load server cert and key: %w", err)
+	server := new(grpc.Server)
+
+	if secure {
+		serverCert, err := tls.LoadX509KeyPair("certs/server.crt", "certs/server.key")
+		if err != nil {
+			return fmt.Errorf("failed to load server cert and key: %w", err)
+		}
+
+		caCert, err := os.ReadFile("certs/ca.crt")
+		if err != nil {
+			// %w wraps the error such that it can later be unwrapped with errors.Unwrap, and so that it can be considered with errors.Is and errors.As
+			return fmt.Errorf("failed to load CA cert: %w", err)
+		}
+
+		certPool := x509.NewCertPool()
+		if !certPool.AppendCertsFromPEM(caCert) {
+			return errors.New("failed to append CA cert to pool")
+		}
+
+		tls := credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{serverCert},
+			ClientCAs:    certPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert, // mTLS
+		})
+
+		// An interceptor is a function that wraps around the execution of an RPC.
+		// It's the gRPC-native mechanism to add cross-cutting concerns like:
+		// Authentication/authorization
+		// Logging
+		// Rate limiting
+		// Metrics
+		// Tracing
+		// Panic recovery
+		// In Go's gRPC world, interceptors are the middleware. Unlike HTTP frameworks (e.g. Chi, Echo)
+		// where "middleware" is stacked via chaining, here we hook into a fixed spot per call type.
+		server = grpc.NewServer(
+			grpc.Creds(tls),
+			grpc.UnaryInterceptor(prom.UnaryServerInterceptor),
+			grpc.StreamInterceptor(fs.CompositeStreamInterceptor),
+		)
+	} else {
+		server = grpc.NewServer(
+			grpc.UnaryInterceptor(prom.UnaryServerInterceptor),
+			grpc.StreamInterceptor(fs.CompositeStreamInterceptor),
+		)
 	}
-
-	caCert, err := os.ReadFile("certs/ca.crt")
-	if err != nil {
-		return fmt.Errorf("failed to load CA cert: %w", err)
-	}
-
-	certPool := x509.NewCertPool()
-	if !certPool.AppendCertsFromPEM(caCert) {
-		return errors.New("failed to append CA cert to pool")
-	}
-
-	tls := credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{serverCert},
-		ClientCAs:    certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert, // mTLS
-	})
-
-	// An interceptor is a function that wraps around the execution of an RPC.
-	// It's the gRPC-native mechanism to add cross-cutting concerns like:
-	// Authentication/authorization
-	// Logging
-	// Rate limiting
-	// Metrics
-	// Tracing
-	// Panic recovery
-	// In Go's gRPC world, interceptors are the middleware. Unlike HTTP frameworks (e.g. Chi, Echo)
-	// where "middleware" is stacked via chaining, here we hook into a fixed spot per call type.
-	server := grpc.NewServer(
-		grpc.Creds(tls),
-		grpc.UnaryInterceptor(prom.UnaryServerInterceptor),
-		grpc.StreamInterceptor(fs.CompositeStreamInterceptor),
-	)
 	proto.RegisterFileManagerServer(server, fs.service)
 	// only registers internal gRPC metrics — it doesn't expose them (hooks into the gRPC server to collect metrics)
 	// Prometheus automatically tracks a variety of gRPC-level metrics, such as:
