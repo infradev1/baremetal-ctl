@@ -4,6 +4,7 @@ import (
 	"baremetal-ctl/internal"
 	"baremetal-ctl/proto"
 	"context"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"log"
@@ -13,15 +14,29 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
 
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
+	// if using a public CA
+	//tls := credentials.NewTLS(&tls.Config{})
+
+	certPool := x509.NewCertPool()
+	cert, err := os.ReadFile("certs/ca.crt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if ok := certPool.AppendCertsFromPEM(cert); !ok {
+		log.Fatal("failed to append CA cert")
+	}
+
+	tls := credentials.NewClientTLSFromCert(certPool, "")
+
 	// In Kubernetes, the Service name would be used, which CoreDNS would resolve to an actual IP address
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(tls))
 	if err != nil {
 		log.Fatal(err)
 	}
