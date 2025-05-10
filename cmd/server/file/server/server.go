@@ -24,14 +24,17 @@ import (
 
 type FileServer struct {
 	address string
+	secure  bool
 	limiter *rate.Limiter
 	service proto.FileManagerServer
 }
 
-func NewFileServer(addr string, svc proto.FileManagerServer) *FileServer {
+func NewFileServer(addr string, tls bool, svc proto.FileManagerServer) *FileServer {
 	return &FileServer{
 		// Standard gRPC address is :50051 (:0 binds to a free port)
 		address: addr,
+		// mTLS
+		secure: tls,
 		// Global rate limiter (100 requests/sec, burst of 10)
 		limiter: rate.NewLimiter(rate.Limit(100), 10),
 		// Dependencies
@@ -39,8 +42,8 @@ func NewFileServer(addr string, svc proto.FileManagerServer) *FileServer {
 	}
 }
 
-func (fs *FileServer) Start(ctx context.Context, ch chan<- string, secure bool) {
-	if err := fs.Run(ctx, ch, secure); err != nil && !errors.Is(err, context.Canceled) {
+func (fs *FileServer) Start(ctx context.Context, ch chan<- string) {
+	if err := fs.Run(ctx, ch); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("error running application", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
@@ -48,13 +51,13 @@ func (fs *FileServer) Start(ctx context.Context, ch chan<- string, secure bool) 
 	slog.Info("closing server gracefully")
 }
 
-func (fs *FileServer) Run(ctx context.Context, ch chan<- string, secure bool) error {
+func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
 	// TLS
 	//tls, err := credentials.NewServerTLSFromFile("certs/server.crt", "certs/server.key")
 
 	server := new(grpc.Server)
 
-	if secure {
+	if fs.secure {
 		serverCert, err := tls.LoadX509KeyPair("certs/server.crt", "certs/server.key")
 		if err != nil {
 			return fmt.Errorf("failed to load server cert and key: %w", err)

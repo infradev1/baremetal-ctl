@@ -24,7 +24,6 @@ func main() {
 
 	// if using a public CA
 	//tls := credentials.NewTLS(&tls.Config{})
-
 	// private
 	//tls := credentials.NewClientTLSFromCert(certPool, "")
 

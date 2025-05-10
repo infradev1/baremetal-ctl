@@ -17,9 +17,9 @@ func main() {
 	)
 	defer cancel()
 
-	s := server.NewFileServer(":50051", file.NewService())
+	s := server.NewFileServer(":50051", true, file.NewService())
 
-	if err := s.Run(ctx, make(chan string), true); err != nil && !errors.Is(err, context.Canceled) {
+	if err := s.Run(ctx, make(chan string)); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("error running application", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
