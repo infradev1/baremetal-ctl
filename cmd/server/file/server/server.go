@@ -16,6 +16,7 @@ import (
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 )
 
@@ -46,6 +47,13 @@ func (fs *FileServer) Start(ctx context.Context, ch chan<- string) {
 }
 
 func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
+	// mTLS
+	tls, err := credentials.NewServerTLSFromFile("certs/server.crt", "certs/server.key")
+	if err != nil {
+		// %w wraps the error such that it can later be unwrapped with errors.Unwrap, and so that it can be considered with errors.Is and errors.As
+		return fmt.Errorf("failed to load TLS credentials: %w", err)
+	}
+
 	// An interceptor is a function that wraps around the execution of an RPC.
 	// It's the gRPC-native mechanism to add cross-cutting concerns like:
 	// Authentication/authorization
@@ -57,6 +65,7 @@ func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
 	// In Go's gRPC world, interceptors are the middleware. Unlike HTTP frameworks (e.g. Chi, Echo)
 	// where "middleware" is stacked via chaining, here we hook into a fixed spot per call type.
 	server := grpc.NewServer(
+		grpc.Creds(tls),
 		grpc.UnaryInterceptor(prom.UnaryServerInterceptor),
 		grpc.StreamInterceptor(fs.CompositeStreamInterceptor),
 	)
