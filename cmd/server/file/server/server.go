@@ -27,10 +27,11 @@ type FileServer struct {
 	secure  bool
 	limiter *rate.Limiter
 	service proto.FileManagerServer
+	options []grpc.ServerOption
 }
 
 func NewFileServer(addr string, tls bool, svc proto.FileManagerServer) *FileServer {
-	return &FileServer{
+	fs := &FileServer{
 		// Standard gRPC address is :50051 (:0 binds to a free port)
 		address: addr,
 		// mTLS
@@ -39,7 +40,35 @@ func NewFileServer(addr string, tls bool, svc proto.FileManagerServer) *FileServ
 		limiter: rate.NewLimiter(rate.Limit(100), 10),
 		// Dependencies
 		service: svc,
+		// Interceptors
+		options: make([]grpc.ServerOption, 0),
 	}
+
+	// An interceptor is a function that wraps around the execution of an RPC.
+	// It's the gRPC-native mechanism to add cross-cutting concerns like:
+	// Authentication/authorization
+	// Logging
+	// Rate limiting
+	// Metrics
+	// Tracing
+	// Panic recovery
+	// In Go's gRPC world, interceptors are the middleware. Unlike HTTP frameworks (e.g. Chi, Echo)
+	// where "middleware" is stacked via chaining, here we hook into a fixed spot per call type.
+	fs.options = append(fs.options,
+		grpc.ChainUnaryInterceptor(
+			prom.UnaryServerInterceptor,
+			LoggingUnaryInterceptor,
+		),
+		grpc.ChainStreamInterceptor(
+			prom.StreamServerInterceptor,
+			fs.RateLimitStreamInterceptor,
+			// Optional: stream logging
+		),
+	)
+
+	fs.SetCredentials()
+
+	return fs
 }
 
 func (fs *FileServer) Start(ctx context.Context, ch chan<- string) {
@@ -51,12 +80,7 @@ func (fs *FileServer) Start(ctx context.Context, ch chan<- string) {
 	slog.Info("closing server gracefully")
 }
 
-func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
-	// TLS
-	//tls, err := credentials.NewServerTLSFromFile("certs/server.crt", "certs/server.key")
-
-	server := new(grpc.Server)
-
+func (fs *FileServer) SetCredentials() error {
 	if fs.secure {
 		serverCert, err := tls.LoadX509KeyPair("certs/server.crt", "certs/server.key")
 		if err != nil {
@@ -80,27 +104,16 @@ func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
 			ClientAuth:   tls.RequireAndVerifyClientCert, // mTLS
 		})
 
-		// An interceptor is a function that wraps around the execution of an RPC.
-		// It's the gRPC-native mechanism to add cross-cutting concerns like:
-		// Authentication/authorization
-		// Logging
-		// Rate limiting
-		// Metrics
-		// Tracing
-		// Panic recovery
-		// In Go's gRPC world, interceptors are the middleware. Unlike HTTP frameworks (e.g. Chi, Echo)
-		// where "middleware" is stacked via chaining, here we hook into a fixed spot per call type.
-		server = grpc.NewServer(
-			grpc.Creds(tls),
-			grpc.UnaryInterceptor(prom.UnaryServerInterceptor),
-			grpc.StreamInterceptor(fs.CompositeStreamInterceptor),
-		)
-	} else {
-		server = grpc.NewServer(
-			grpc.UnaryInterceptor(prom.UnaryServerInterceptor),
-			grpc.StreamInterceptor(fs.CompositeStreamInterceptor),
-		)
+		fs.options = append(fs.options, grpc.Creds(tls))
 	}
+
+	return nil
+}
+
+func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
+	// TLS
+	//tls, err := credentials.NewServerTLSFromFile("certs/server.crt", "certs/server.key")
+	server := grpc.NewServer(fs.options...)
 	proto.RegisterFileManagerServer(server, fs.service)
 	// only registers internal gRPC metrics — it doesn't expose them (hooks into the gRPC server to collect metrics)
 	// Prometheus automatically tracks a variety of gRPC-level metrics, such as:
@@ -169,11 +182,15 @@ func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
 	return g.Wait()
 }
 
-// CompositeStreamInterceptor checks rate limits for streaming RPCs and sets up Prometheus.
-// Limits how many streams a client can open.
-func (fs *FileServer) CompositeStreamInterceptor(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+// RateLimitStreamInterceptor checks rate limits for streaming RPCs. Limits how many streams a client can open.
+func (fs *FileServer) RateLimitStreamInterceptor(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	if !fs.limiter.Allow() {
 		return status.Errorf(codes.ResourceExhausted, "rate limit exceeded")
 	}
-	return prom.StreamServerInterceptor(srv, ss, info, handler)
+	return handler(srv, ss)
+}
+
+func LoggingUnaryInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+	slog.Info("gRPC request received", slog.String("UnaryServerInfo", info.FullMethod))
+	return handler(ctx, req)
 }
