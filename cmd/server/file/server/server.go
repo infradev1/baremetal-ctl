@@ -3,6 +3,8 @@ package server
 import (
 	"baremetal-ctl/proto"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -47,12 +49,33 @@ func (fs *FileServer) Start(ctx context.Context, ch chan<- string) {
 }
 
 func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
-	// mTLS
-	tls, err := credentials.NewServerTLSFromFile("certs/server.crt", "certs/server.key")
+	// TLS
+	//tls, err := credentials.NewServerTLSFromFile("certs/server.crt", "certs/server.key")
+	//if err != nil {
+	//	// %w wraps the error such that it can later be unwrapped with errors.Unwrap, and so that it can be considered with errors.Is and errors.As
+	//	return fmt.Errorf("failed to load TLS credentials: %w", err)
+	//}
+
+	serverCert, err := tls.LoadX509KeyPair("certs/server.crt", "certs/server.key")
 	if err != nil {
-		// %w wraps the error such that it can later be unwrapped with errors.Unwrap, and so that it can be considered with errors.Is and errors.As
-		return fmt.Errorf("failed to load TLS credentials: %w", err)
+		return fmt.Errorf("failed to load server cert and key: %w", err)
 	}
+
+	caCert, err := os.ReadFile("certs/ca.crt")
+	if err != nil {
+		return fmt.Errorf("failed to load CA cert: %w", err)
+	}
+
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(caCert) {
+		return errors.New("failed to append CA cert to pool")
+	}
+
+	tls := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientCAs:    certPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert, // mTLS
+	})
 
 	// An interceptor is a function that wraps around the execution of an RPC.
 	// It's the gRPC-native mechanism to add cross-cutting concerns like:

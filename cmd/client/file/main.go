@@ -4,6 +4,7 @@ import (
 	"baremetal-ctl/internal"
 	"baremetal-ctl/proto"
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -24,16 +25,27 @@ func main() {
 	// if using a public CA
 	//tls := credentials.NewTLS(&tls.Config{})
 
+	// private
+	//tls := credentials.NewClientTLSFromCert(certPool, "")
+
 	certPool := x509.NewCertPool()
-	cert, err := os.ReadFile("certs/ca.crt")
+	caCert, err := os.ReadFile("certs/ca.crt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	if ok := certPool.AppendCertsFromPEM(cert); !ok {
+	if ok := certPool.AppendCertsFromPEM(caCert); !ok {
 		log.Fatal("failed to append CA cert")
 	}
 
-	tls := credentials.NewClientTLSFromCert(certPool, "")
+	clientCert, err := tls.LoadX509KeyPair("certs/client.crt", "certs/client.key")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tls := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{clientCert},
+		RootCAs:      certPool,
+	})
 
 	// In Kubernetes, the Service name would be used, which CoreDNS would resolve to an actual IP address
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(tls))
