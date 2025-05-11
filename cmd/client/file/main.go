@@ -49,7 +49,13 @@ func main() {
 	// In Kubernetes, the Service name would be used, which CoreDNS would resolve to an actual IP address
 	conn, err := grpc.NewClient("localhost:50051",
 		grpc.WithTransportCredentials(tls),
-		grpc.WithUnaryInterceptor(
+		grpc.WithChainUnaryInterceptor(
+			func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+				start := time.Now()
+				err := invoker(ctx, method, req, reply, cc, opts...)                       // call next interceptor in the chain (logger)
+				slog.Info("request time", slog.String(method, time.Since(start).String())) // includes logging time
+				return err
+			},
 			func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 				slog.Info("sending request", slog.String(method, fmt.Sprintf("%v", req)))
 				err := invoker(ctx, method, req, reply, cc, opts...)
