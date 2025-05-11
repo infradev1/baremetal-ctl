@@ -190,7 +190,9 @@ func (fs *FileServer) RateLimitStreamInterceptor(srv any, ss grpc.ServerStream, 
 	return handler(srv, ss)
 }
 
-func LoggingUnaryInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+func LoggingUnaryInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	slog.Info("gRPC request received", slog.String("UnaryServerInfo", info.FullMethod))
-	return handler(ctx, req)
+	resp, err := handler(ctx, req)
+	slog.Info("gRPC response", slog.String(info.FullMethod, fmt.Sprintf("%v", resp)))
+	return resp, err
 }

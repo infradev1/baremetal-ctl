@@ -47,7 +47,17 @@ func main() {
 	})
 
 	// In Kubernetes, the Service name would be used, which CoreDNS would resolve to an actual IP address
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(tls))
+	conn, err := grpc.NewClient("localhost:50051",
+		grpc.WithTransportCredentials(tls),
+		grpc.WithUnaryInterceptor(
+			func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+				slog.Info("sending request", slog.String(method, fmt.Sprintf("%v", req)))
+				err := invoker(ctx, method, req, reply, cc, opts...)
+				slog.Info("received response", slog.String(method, fmt.Sprintf("%v", reply)))
+				return err
+			},
+		),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
