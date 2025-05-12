@@ -49,7 +49,7 @@ func main() {
 	// In Kubernetes, the Service name would be used, which CoreDNS would resolve to an actual IP address
 	conn, err := grpc.NewClient("localhost:50051",
 		grpc.WithTransportCredentials(tls),
-		grpc.WithChainUnaryInterceptor(
+		grpc.WithChainUnaryInterceptor( // only applies to unary rpc calls
 			func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 				start := time.Now()
 				err := invoker(ctx, method, req, reply, cc, opts...)                       // call next interceptor in the chain (logger)
@@ -63,6 +63,7 @@ func main() {
 				return err
 			},
 		),
+		// optional: add client-side streaming chained interceptors
 	)
 	if err != nil {
 		log.Fatal(err)

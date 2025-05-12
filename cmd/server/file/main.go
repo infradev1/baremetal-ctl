@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -17,7 +18,7 @@ func main() {
 	)
 	defer cancel()
 
-	s := server.NewFileServer(":50051", true, file.NewService())
+	s := server.NewFileServer(":50051", true, 30*time.Second, file.NewService())
 
 	if err := s.Run(ctx, make(chan string)); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("error running application", slog.String("error", err.Error()))

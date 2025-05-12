@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	prom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -25,17 +26,20 @@ import (
 type FileServer struct {
 	address string
 	secure  bool
+	timeout time.Duration
 	limiter *rate.Limiter
 	service proto.FileManagerServer
 	options []grpc.ServerOption
 }
 
-func NewFileServer(addr string, tls bool, svc proto.FileManagerServer) *FileServer {
+func NewFileServer(addr string, tls bool, t time.Duration, svc proto.FileManagerServer) *FileServer {
 	fs := &FileServer{
 		// Standard gRPC address is :50051 (:0 binds to a free port)
 		address: addr,
 		// mTLS
 		secure: tls,
+		// global server timeout
+		timeout: t,
 		// Global rate limiter (100 requests/sec, burst of 10)
 		limiter: rate.NewLimiter(rate.Limit(100), 10),
 		// Dependencies
@@ -164,9 +168,14 @@ func (fs *FileServer) Run(ctx context.Context, ch chan<- string) error {
 	})
 
 	g.Go(func() error {
-		// wait on the Done channel of the Context (blocks in its own goroutine)
-		<-ctx.Done()
-		// continues executing when the Context is cancelled
+		// "blocks" in its own goroutine
+		select {
+		case <-ctx.Done():
+			slog.Info("context done")
+		case <-time.Tick(fs.timeout):
+			slog.Info("tick done")
+		}
+		// continues executing when the Context is cancelled or when the clock ticks
 
 		slog.Info("shutting down Prometheus metrics server")
 		if err := srv.Shutdown(context.Background()); err != nil {

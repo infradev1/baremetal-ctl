@@ -30,7 +30,7 @@ func TestUploadFile_Success(t *testing.T) {
 	)
 	defer cancel()
 
-	go server.NewFileServer(":0", false, NewService()).Start(ctx, address)
+	go server.NewFileServer(":0", false, 1*time.Minute, NewService()).Start(ctx, address)
 
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
@@ -70,7 +70,7 @@ func TestUploadFile_Failure(t *testing.T) {
 	)
 	defer cancel()
 
-	go server.NewFileServer(":0", false, NewService()).Start(ctx, address)
+	go server.NewFileServer(":0", false, 1*time.Minute, NewService()).Start(ctx, address)
 
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()

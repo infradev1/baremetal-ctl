@@ -28,7 +28,7 @@ func TestGlobalRateLimit(t *testing.T) {
 	)
 	defer cancel()
 
-	go NewFileServer(":0", false, file.NewService()).Start(ctx, address)
+	go NewFileServer(":0", false, 10*time.Second, file.NewService()).Start(ctx, address)
 
 	serverAddress = <-address // read once
 
