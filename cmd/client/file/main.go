@@ -16,9 +16,11 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 )
 
 func main() {
+	// client-side deadline
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
@@ -78,11 +80,25 @@ func main() {
 	n := Download(ctx, client, fn)
 	log.Printf("successfully downloaded %d bytes from server", n)
 
-	res, err := client.SayHello(ctx, &proto.SayHelloRequest{Name: "Charles"})
+	md := metadata.Pairs("x-request-id", "12345") // adding a header to the request
+	// maps populated by the server
+	var (
+		headers  = metadata.New(map[string]string{})
+		trailers = metadata.New(map[string]string{})
+	)
+
+	res, err := client.SayHello(
+		metadata.NewOutgoingContext(ctx, md),
+		&proto.SayHelloRequest{Name: "Charles"},
+		grpc.Header(&headers),
+		grpc.Trailer(&trailers),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
 	slog.Info(res.GetMessage())
+	slog.Info(fmt.Sprintf("%s", headers))
+	slog.Info(fmt.Sprintf("%s", trailers))
 
 	g, ctx := errgroup.WithContext(ctx)
 

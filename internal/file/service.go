@@ -8,10 +8,12 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -100,9 +102,29 @@ func (s *Service) Echo(stream grpc.BidiStreamingServer[proto.EchoRequest, proto.
 
 // unary RPC (context use enforced)
 func (s *Service) SayHello(ctx context.Context, r *proto.SayHelloRequest) (*proto.SayHelloResponse, error) {
+	start := time.Now()
+
 	if r.GetName() == "" {
 		// errors.New("...") also possible for less error handling client side
 		return nil, status.Error(codes.InvalidArgument, "name cannot be empty")
+	}
+
+	if md, ok := metadata.FromIncomingContext(ctx); ok && len(md.Get("x-request-id")) > 0 {
+		slog.Info("request header", slog.String("x-request-id", md.Get("x-request-id")[0]))
+	}
+
+	header := metadata.New(map[string]string{
+		"request-start-timestamp": start.String(),
+	})
+	if err := grpc.SendHeader(ctx, header); err != nil {
+		return nil, status.Error(codes.Internal, "failed to send header from server to client")
+	}
+
+	trailer := metadata.New(map[string]string{
+		"request-end-timestamp": time.Now().String(),
+	})
+	if err := grpc.SetTrailer(ctx, trailer); err != nil {
+		return nil, status.Error(codes.Internal, "failed to send trailer from server to client")
 	}
 
 	return &proto.SayHelloResponse{Message: fmt.Sprintf("Hello %s!", r.GetName())}, nil

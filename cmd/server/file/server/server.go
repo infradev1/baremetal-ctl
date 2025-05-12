@@ -38,7 +38,7 @@ func NewFileServer(addr string, tls bool, t time.Duration, svc proto.FileManager
 		address: addr,
 		// mTLS
 		secure: tls,
-		// global server timeout
+		// server-side deadline (TTL)
 		timeout: t,
 		// Global rate limiter (100 requests/sec, burst of 10)
 		limiter: rate.NewLimiter(rate.Limit(100), 10),
