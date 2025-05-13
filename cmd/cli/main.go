@@ -16,57 +16,96 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
-	"sync"
+	"os/signal"
+	"syscall"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const (
 	concurrencyLimit = 10
 	deadline         = 5 * time.Second
+	retries          = 3
 )
 
 func main() {
-	inputFile := os.Args[1]
-	outputFile := os.Args[2]
-	urls := make([]string, 0)
+	inputFile := os.Args[1]  // validate input
+	outputFile := os.Args[2] // validate input
 
-	file, err := os.Open(inputFile) // could OOM if file is too large
+	file, err := os.Open(inputFile) // could OOM if a large file is read directly
 	if err != nil {
 		log.Fatalf("failed to open input file %s: %v", inputFile, err)
 	}
 	defer file.Close()
 
-	out, err := os.Create(outputFile)
+	out, err := os.Create(outputFile) // careful about concurrent writes
 	if err != nil {
 		log.Fatalf("failed to create output file %s: %v", outputFile, err)
 	}
 	defer out.Close()
 
+	ctx, cancel := signal.NotifyContext(context.Background(),
+		os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGTERM,
+	)
+	defer cancel()
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(concurrencyLimit)
+
+	urls := make(chan string, concurrencyLimit)
+	responses := make(chan string)
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		urls = append(urls, scanner.Text())
-	}
+		urls <- scanner.Text()
 
-	sem := make(chan struct{}, concurrencyLimit)
-	g := sync.WaitGroup{}
-	c := context.Background()
-
-	for _, url := range urls {
-		sem <- struct{}{} // blocks when channel is full
-		g.Add(1)
-
-		go func(url string) {
+		g.Go(func() error {
 			start := time.Now()
 
-			ctx, cancel := context.WithTimeout(c, deadline)
+			// optional: wrap in exponential backoff with retries
+			c, cancel := context.WithTimeout(ctx, deadline)
 			defer cancel()
 
-			resp, err := http.Get(url)
+			req, err := http.NewRequestWithContext(c, http.MethodGet, <-urls, nil)
 			if err != nil {
-				_, err := out.WriteString(fmt.Sprintf("Status Code: %d, Request Duration: %s", resp.StatusCode, time.Since(start).String()))
+				return fmt.Errorf("error creating request: %w", err)
 			}
-		}(url)
+
+			for i := range retries {
+				if i == retries {
+					return fmt.Errorf("request failed after %d retries", retries)
+				}
+
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					return fmt.Errorf("error getting response: %w", err)
+				}
+				if resp.StatusCode >= 500 || resp.StatusCode < 600 {
+					continue
+				}
+
+				responses <- fmt.Sprintf("Status Code: %d, Request Duration: %s", resp.StatusCode, time.Since(start).String())
+				break
+			}
+
+			return nil
+		})
+	}
+
+	// Writer goroutine
+	go func() {
+		for r := range responses {
+			if _, err := fmt.Fprintf(out, "%s", r); err != nil {
+				slog.Error("failed to write error status code string to output file", slog.String("error", err.Error()))
+			}
+		}
+	}()
+
+	if err = g.Wait(); err != nil {
+		slog.Error("GET failed", slog.String("error", err.Error()))
 	}
 }
