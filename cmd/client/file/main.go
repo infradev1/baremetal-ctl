@@ -92,6 +92,8 @@ func main() {
 		&proto.SayHelloRequest{Name: "Charles"},
 		grpc.Header(&headers),
 		grpc.Trailer(&trailers),
+		grpc.MaxCallRecvMsgSize(100), // various additional call options available
+		grpc.MaxCallSendMsgSize(100),
 	)
 	if err != nil {
 		log.Fatal(err)
