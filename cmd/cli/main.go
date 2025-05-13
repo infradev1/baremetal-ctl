@@ -16,10 +16,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -28,84 +28,118 @@ import (
 
 const (
 	concurrencyLimit = 10
-	deadline         = 5 * time.Second
-	retries          = 3
+	requestTimeout   = 5 * time.Second
+	maxRetries       = 3
 )
 
+type result struct {
+	URL      string
+	Status   int
+	Duration time.Duration
+	Err      error
+}
+
 func main() {
-	inputFile := os.Args[1]  // validate input
-	outputFile := os.Args[2] // validate input
+	if len(os.Args) != 3 {
+		log.Fatalf("Usage: %s input.txt output.txt", os.Args[0])
+	}
 
-	file, err := os.Open(inputFile) // could OOM if a large file is read directly
+	inputPath := os.Args[1]
+	outputPath := os.Args[2]
+
+	inFile, err := os.Open(inputPath)
 	if err != nil {
-		log.Fatalf("failed to open input file %s: %v", inputFile, err)
+		log.Fatalf("Failed to open input file: %v", err)
 	}
-	defer file.Close()
+	defer inFile.Close()
 
-	out, err := os.Create(outputFile) // careful about concurrent writes
+	outFile, err := os.Create(outputPath)
 	if err != nil {
-		log.Fatalf("failed to create output file %s: %v", outputFile, err)
+		log.Fatalf("Failed to create output file: %v", err)
 	}
-	defer out.Close()
+	defer outFile.Close()
 
-	ctx, cancel := signal.NotifyContext(context.Background(),
-		os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGTERM,
-	)
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(concurrencyLimit)
+	results := make(chan result, concurrencyLimit)
 
-	urls := make(chan string, concurrencyLimit)
-	responses := make(chan string)
+	var writeWG sync.WaitGroup
+	writeWG.Add(1)
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		urls <- scanner.Text()
-
-		g.Go(func() error {
-			start := time.Now()
-
-			// optional: wrap in exponential backoff with retries
-			c, cancel := context.WithTimeout(ctx, deadline)
-			defer cancel()
-
-			req, err := http.NewRequestWithContext(c, http.MethodGet, <-urls, nil)
-			if err != nil {
-				return fmt.Errorf("error creating request: %w", err)
-			}
-
-			for i := range retries {
-				if i == retries {
-					return fmt.Errorf("request failed after %d retries", retries)
-				}
-
-				resp, err := http.DefaultClient.Do(req)
-				if err != nil {
-					return fmt.Errorf("error getting response: %w", err)
-				}
-				if resp.StatusCode >= 500 || resp.StatusCode < 600 {
-					continue
-				}
-
-				responses <- fmt.Sprintf("Status Code: %d, Request Duration: %s", resp.StatusCode, time.Since(start).String())
-				break
-			}
-
-			return nil
-		})
-	}
-
-	// Writer goroutine
 	go func() {
-		for r := range responses {
-			if _, err := fmt.Fprintf(out, "%s", r); err != nil {
-				slog.Error("failed to write error status code string to output file", slog.String("error", err.Error()))
+		defer writeWG.Done()
+		writer := bufio.NewWriter(outFile)
+		defer writer.Flush()
+
+		for r := range results {
+			if r.Err != nil {
+				fmt.Fprintf(writer, "%s ERROR: %v\n", r.URL, r.Err)
+			} else {
+				fmt.Fprintf(writer, "%s %d %v\n", r.URL, r.Status, r.Duration)
 			}
 		}
 	}()
 
-	if err = g.Wait(); err != nil {
-		slog.Error("GET failed", slog.String("error", err.Error()))
+	scanner := bufio.NewScanner(inFile)
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(concurrencyLimit)
+
+	for scanner.Scan() {
+		url := scanner.Text() // capture by value
+		g.Go(func() error {
+			start := time.Now()
+			status, err := fetchWithRetries(ctx, url)
+			duration := time.Since(start)
+
+			results <- result{
+				URL:      url,
+				Status:   status,
+				Duration: duration,
+				Err:      err,
+			}
+			return nil // return error only for fatal issues
+		})
 	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("Error reading input file: %v", err)
+	}
+
+	if err := g.Wait(); err != nil {
+		log.Printf("One or more requests failed: %v", err)
+	}
+
+	close(results)
+	writeWG.Wait()
+}
+
+func fetchWithRetries(ctx context.Context, url string) (int, error) {
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+		if err != nil {
+			return 0, fmt.Errorf("request creation failed: %w", err)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 500 && resp.StatusCode <= 599 {
+			lastErr = fmt.Errorf("server error %d", resp.StatusCode)
+			continue
+		}
+
+		return resp.StatusCode, nil
+	}
+
+	return 0, fmt.Errorf("request failed after %d retries: %w", maxRetries, lastErr)
 }
