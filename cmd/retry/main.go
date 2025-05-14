@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
 	"time"
 
@@ -58,6 +59,7 @@ func main() {
 		defer wg.Done()
 		w := bufio.NewWriter(out)
 		defer w.Flush()
+		lineCount := 0
 
 		for r := range results {
 			if r.err != nil {
@@ -69,11 +71,18 @@ func main() {
 					log.Fatal(err)
 				}
 			}
+			lineCount++
+			if lineCount%100 == 0 {
+				w.Flush() // flush in intervals to lower memory pressure
+			}
 		}
 	}()
 
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer cancel()
+
 	// main writer logic
-	g, ctx := errgroup.WithContext(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxConcurrency)
 
 	scanner := bufio.NewScanner(file)
