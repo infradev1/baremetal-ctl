@@ -59,7 +59,7 @@ func main() {
 	}
 	defer outFile.Close()
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 
 	results := make(chan result, concurrencyLimit)
@@ -117,7 +117,7 @@ func main() {
 func fetchWithRetries(ctx context.Context, url string) (int, error) {
 	var lastErr error
 
-	for i := 0; i < maxRetries; i++ {
+	for range maxRetries {
 		reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 		defer cancel()
 
