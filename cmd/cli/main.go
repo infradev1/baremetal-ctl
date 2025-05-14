@@ -70,6 +70,7 @@ func main() {
 	go func() {
 		defer writeWG.Done()
 		writer := bufio.NewWriter(outFile)
+		lineCount := 5
 		defer writer.Flush()
 
 		for r := range results {
@@ -78,6 +79,11 @@ func main() {
 			} else {
 				fmt.Fprintf(writer, "%s %d %v\n", r.URL, r.Status, r.Duration)
 			}
+		}
+
+		lineCount++
+		if lineCount%100 == 0 {
+			writer.Flush()
 		}
 	}()
 
