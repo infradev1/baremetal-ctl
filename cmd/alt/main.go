@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // type aliases for readability
@@ -75,8 +77,7 @@ func writeFile(contents []*LogSummary) error {
 
 // gpu-node-17: 5 total (INFO=3, ERROR=1, WARN=1)
 // gpu-node-32: 2 total (INFO=1, ERROR=1, WARN=0)
-func (l *Log) WriteSummary(ctx context.Context, sortBy string, outFormat string) error {
-
+func (l *Log) WriteSummary(sortBy string, outFormat string) error {
 	summary := make([]*LogSummary, 0)
 
 	for node, status := range l.nodeInfo {
@@ -122,12 +123,12 @@ type Worker struct {
 
 type WorkerPool struct {
 	workers []Worker
+	group   *errgroup.Group
 }
 
 type Job struct {
 	work string
 	log  *Log
-	wg   *sync.WaitGroup
 }
 
 func (wp *WorkerPool) SubmitJob(job Job) {
@@ -142,31 +143,44 @@ func (wp *WorkerPool) Close() {
 	}
 }
 
-func NewWorkerPool(maxConcurrency, bufferSize int) *WorkerPool {
+func NewWorkerPool(ctx context.Context, maxConcurrency, bufferSize int) *WorkerPool {
 	workers := make([]Worker, 0, maxConcurrency)
 	for range maxConcurrency {
 		workers = append(workers, Worker{queue: make(chan Job, bufferSize)}) // higher throughput, same goroutine count
 	}
-	wp := &WorkerPool{workers: workers}
+
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(maxConcurrency)
+
+	wp := &WorkerPool{
+		workers: workers,
+		group:   g,
+	}
 
 	for _, w := range wp.workers {
-		go func() {
+		g.Go(func() error {
 			// receive job
 			for job := range w.queue {
-				// call function that accepts the context, with deadline if HTTP requests for example
-				elements := strings.Split(job.work, " ")
-				if len(elements) < 5 {
-					log.Printf("invalid log entry: %s", job.work)
-					continue
-				}
-				// index 1: type, index 3: node name
-				t := elements[1]
-				n := elements[3]
+				// context-aware job processing
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+					elements := strings.Split(job.work, " ")
+					if len(elements) < 5 {
+						// optional: return error
+						log.Printf("invalid log entry: %s", job.work)
+						continue
+					}
+					// index 1: type, index 3: node name
+					t := elements[1]
+					n := elements[3]
 
-				job.log.Update(n, t)
-				job.wg.Done()
+					job.log.Update(n, t)
+				}
 			}
-		}()
+			return nil
+		})
 	}
 
 	return wp
@@ -198,40 +212,32 @@ func main() {
 	defer file.Close()
 
 	nodeLog := NewLog()
-	wp := NewWorkerPool(maxConcurrency, bufferSize)
-	wg := &sync.WaitGroup{}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-
-	signalWg := &sync.WaitGroup{}
-	signalWg.Add(1)
-	go func() {
-		defer signalWg.Done()
-		<-ctx.Done()
-		log.Println("closing worker channels")
-		wp.Close()
-		log.Println("terminated application gracefully")
-	}()
+	defer cancel()
+	wp := NewWorkerPool(ctx, maxConcurrency, bufferSize)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		wg.Add(1)
 		wp.SubmitJob(Job{
 			work: scanner.Text(),
 			log:  nodeLog,
-			wg:   wg,
 		})
 	}
-	wg.Wait()
 
+	// exit early from critical errors (i.e. malformed file)
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := nodeLog.WriteSummary(ctx, sortBy, outputFormat); err != nil {
+	// wait until all channels are drained
+	wp.Close()
+	if err := wp.group.Wait(); err != nil {
+		log.Printf("first worker error: %v", err)
+	}
+
+	if err := nodeLog.WriteSummary(sortBy, outputFormat); err != nil {
 		log.Fatal(err)
 	}
 
-	cancel()
-	signalWg.Wait()
+	log.Println("terminated application gracefully")
 }
