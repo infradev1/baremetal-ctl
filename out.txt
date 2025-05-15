@@ -1,5 +1,0 @@
-http://www.doesnotexisttesting.com, Get "http://www.doesnotexisttesting.com": dial tcp: lookup www.doesnotexisttesting.com: no such host
-http://www.google.com, 200, 193.363334ms
-http://www.microsoft.com, 200, 378.780458ms
-http://www.amazon.com, 200, 443.018ms
-http://www.apple.com, 200, 489.663667ms

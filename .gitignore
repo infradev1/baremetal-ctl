@@ -2,3 +2,5 @@ vendor/
 certs/
 input.txt
 output.txt
+out.txt
+log.txt
