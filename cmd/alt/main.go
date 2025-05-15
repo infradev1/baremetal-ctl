@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -45,12 +46,12 @@ func (l *Log) Update(name NodeName, status string) {
 type LogSummary struct {
 	node  NodeName
 	total int
-	types map[string]int
+	types StatusCounts
 }
 
 // gpu-node-17: 5 total (INFO=3, ERROR=1, WARN=1)
 // gpu-node-32: 2 total (INFO=1, ERROR=1, WARN=0)
-func (l *Log) PrintSummary() {
+func (l *Log) PrintSummary(sortBy string) {
 	summary := make([]*LogSummary, 0)
 
 	for node, status := range l.nodeInfo {
@@ -67,19 +68,26 @@ func (l *Log) PrintSummary() {
 	}
 
 	slices.SortFunc(summary, func(a, b *LogSummary) int {
-		return cmp.Compare(b.total, a.total) // descending order
+		if sortBy == "total" {
+			return cmp.Compare(b.total, a.total) // descending order
+		}
+		return cmp.Compare(a.node, b.node) // descending order
 	})
 
+	total := 0
 	for _, s := range summary {
 		log.Printf("%s: %d total (INFO=%d, ERROR=%d, WARN=%d)",
 			s.node, s.total, s.types["[INFO]"], s.types["[ERROR]"], s.types["[WARN]"],
 		)
+		total += s.total
 	}
+
+	log.Printf("%d total log entries processed", total)
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		log.Fatal("required format: go run main.go log.txt n, where n is max concurrency")
+	if len(os.Args) != 4 {
+		log.Fatal("required format: go run main.go log.txt n sortBy, where n is max concurrency and sortBy: name | total")
 	}
 	// read input file stream (logs.txt)
 	file, err := os.Open(os.Args[1])
@@ -93,9 +101,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	sortBy := os.Args[3]
+
 	nodeLog := NewLog()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -129,5 +139,5 @@ func main() {
 		log.Printf("error parsing entry: %v", err)
 	}
 
-	nodeLog.PrintSummary()
+	nodeLog.PrintSummary(sortBy)
 }
