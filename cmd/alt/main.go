@@ -121,9 +121,32 @@ type Worker struct {
 	queue chan Job
 }
 
+func (w *Worker) Start(ctx context.Context) error {
+	// receive job
+	for job := range w.queue {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			elements := strings.Split(job.work, " ")
+			if len(elements) < 5 {
+				// optional: return error or send to DLQ
+				log.Printf("invalid log entry: %s", job.work)
+				continue
+			}
+			// index 1: type, index 3: node name
+			t := elements[1]
+			n := elements[3]
+
+			job.log.Update(n, t)
+		}
+	}
+	return nil
+}
+
 type WorkerPool struct {
-	workers []Worker
-	group   *errgroup.Group
+	workers []*Worker
+	*errgroup.Group
 }
 
 type Job struct {
@@ -144,42 +167,19 @@ func (wp *WorkerPool) Close() {
 }
 
 func NewWorkerPool(ctx context.Context, maxConcurrency, bufferSize int) *WorkerPool {
-	workers := make([]Worker, 0, maxConcurrency)
+	workers := make([]*Worker, 0, maxConcurrency)
 	for range maxConcurrency {
-		workers = append(workers, Worker{queue: make(chan Job, bufferSize)}) // higher throughput, same goroutine count
+		workers = append(workers, &Worker{queue: make(chan Job, bufferSize)}) // higher throughput, same goroutine count
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxConcurrency)
 
-	wp := &WorkerPool{
-		workers: workers,
-		group:   g,
-	}
+	wp := &WorkerPool{workers, g}
 
-	for _, w := range wp.workers {
+	for _, worker := range wp.workers {
 		g.Go(func() error {
-			// receive job
-			for job := range w.queue {
-				// context-aware job processing
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				default:
-					elements := strings.Split(job.work, " ")
-					if len(elements) < 5 {
-						// optional: return error
-						log.Printf("invalid log entry: %s", job.work)
-						continue
-					}
-					// index 1: type, index 3: node name
-					t := elements[1]
-					n := elements[3]
-
-					job.log.Update(n, t)
-				}
-			}
-			return nil
+			return worker.Start(ctx)
 		})
 	}
 
@@ -231,7 +231,7 @@ func main() {
 
 	// wait until all channels are drained
 	wp.Close()
-	if err := wp.group.Wait(); err != nil {
+	if err := wp.Wait(); err != nil {
 		log.Printf("first worker error: %v", err)
 	}
 
