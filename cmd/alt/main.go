@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"cmp"
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"os/signal"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -75,7 +75,8 @@ func writeFile(contents []*LogSummary) error {
 
 // gpu-node-17: 5 total (INFO=3, ERROR=1, WARN=1)
 // gpu-node-32: 2 total (INFO=1, ERROR=1, WARN=0)
-func (l *Log) WriteSummary(sortBy string, outFormat string) error {
+func (l *Log) WriteSummary(ctx context.Context, sortBy string, outFormat string) error {
+
 	summary := make([]*LogSummary, 0)
 
 	for node, status := range l.nodeInfo {
@@ -141,10 +142,10 @@ func (wp *WorkerPool) Close() {
 	}
 }
 
-func NewWorkerPool(maxConcurrency int) *WorkerPool {
+func NewWorkerPool(maxConcurrency, bufferSize int) *WorkerPool {
 	workers := make([]Worker, 0, maxConcurrency)
 	for range maxConcurrency {
-		workers = append(workers, Worker{queue: make(chan Job, 100)}) // higher throughput, same goroutine count
+		workers = append(workers, Worker{queue: make(chan Job, bufferSize)}) // higher throughput, same goroutine count
 	}
 	wp := &WorkerPool{workers: workers}
 
@@ -172,32 +173,40 @@ func NewWorkerPool(maxConcurrency int) *WorkerPool {
 }
 
 func main() {
-	if len(os.Args) != 5 {
-		log.Fatal("required format: go run main.go log.txt n sortBy, where n is max concurrency, sortBy: name | total, and output: print | file")
-	}
+	var inputLog string
+	flag.StringVar(&inputLog, "in", "log.txt", "input file path (default log.txt)")
+
+	var maxConcurrency int
+	flag.IntVar(&maxConcurrency, "concurrency", 5, "number of workers in the worker pool (default: 5)")
+
+	var bufferSize int
+	flag.IntVar(&bufferSize, "buffer", 100, "channel buffer size per worker (default: 100)")
+
+	var sortBy string
+	flag.StringVar(&sortBy, "sortBy", "total", "name | total")
+
+	var outputFormat string
+	flag.StringVar(&outputFormat, "out", "print", "print | file")
+
+	flag.Parse()
+
 	// read input file stream (logs.txt)
-	file, err := os.Open(os.Args[1])
+	file, err := os.Open(inputLog)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-	maxConcurrency, err := strconv.Atoi(os.Args[2])
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	sortBy := os.Args[3]
-	outputFormat := os.Args[4]
-
 	nodeLog := NewLog()
-	wp := NewWorkerPool(maxConcurrency)
+	wp := NewWorkerPool(maxConcurrency, bufferSize)
 	wg := &sync.WaitGroup{}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
 
+	signalWg := &sync.WaitGroup{}
+	signalWg.Add(1)
 	go func() {
+		defer signalWg.Done()
 		<-ctx.Done()
 		log.Println("closing worker channels")
 		wp.Close()
@@ -219,7 +228,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := nodeLog.WriteSummary(sortBy, outputFormat); err != nil {
+	if err := nodeLog.WriteSummary(ctx, sortBy, outputFormat); err != nil {
 		log.Fatal(err)
 	}
+
+	cancel()
+	signalWg.Wait()
 }
