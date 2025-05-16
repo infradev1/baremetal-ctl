@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -23,14 +24,22 @@ type GPUHealthCheck struct {
 	Status string
 }
 
+type GPUHealthResult struct {
+	NodeId  string `json:"node_id"`
+	Healthy bool   `json:"healthy"`
+	Error   string `json:"error,omitempty"`
+}
+
 // the provisioning process for a GPU includes applying this CRD
-type Job[T GPUHealthCheck] struct {
+type Job struct {
 	Context context.Context // timeout
-	CRD     T
+	CRD     GPUHealthCheck
+	Results chan<- *GPUHealthResult
 }
 
 type Worker struct {
-	Queue chan Job[GPUHealthCheck]
+	Id    int
+	Queue chan Job
 }
 
 type WorkerPoolSpec struct {
@@ -41,10 +50,10 @@ type WorkerPoolSpec struct {
 }
 
 type WorkerPool struct {
-	Workers []Worker
+	Workers []*Worker
 }
 
-func (wp *WorkerPool) SubmitJob(job Job[GPUHealthCheck]) {
+func (wp *WorkerPool) SubmitJob(job Job) {
 	// in production, use round-robin load balancing or partition key hashing function like Kafka
 	i := rand.Intn(len(wp.Workers))
 	wp.Workers[i].Queue <- job
@@ -57,11 +66,12 @@ func (wp *WorkerPool) Close() {
 }
 
 func NewWorkerPool(spec WorkerPoolSpec) *WorkerPool {
-	workers := make([]Worker, 0, spec.WorkerCount)
+	workers := make([]*Worker, 0, spec.WorkerCount)
 
-	for range spec.WorkerCount {
-		worker := Worker{
-			Queue: make(chan Job[GPUHealthCheck], spec.BufferSize),
+	for i := range spec.WorkerCount {
+		worker := &Worker{
+			Id:    i,
+			Queue: make(chan Job, spec.BufferSize),
 		}
 
 		spec.Go(func() error {
@@ -69,20 +79,37 @@ func NewWorkerPool(spec WorkerPoolSpec) *WorkerPool {
 			for job := range worker.Queue { // must be closed by producer(s)
 				ctx, cancel := context.WithTimeout(job.Context, 5*time.Second)
 				retries := 0
+				var result *GPUHealthResult
+				var lastError error
+
+				log.Printf("WORKER ID: %d\n", worker.Id)
 
 				// retry on failure
 				for retries < spec.RetryCount {
 					// pass context with timeout to rpc call(s)
-					status, err := SimulateRPCCall(ctx, job.CRD.NodeId)
-					if err != nil {
-						log.Println(err) // export to Prometheus in prod
+					if _, err := SimulateRPCCall(ctx, job.CRD.NodeId); err != nil {
+						lastError = err // export to Prometheus in prod
 						retries++
+						time.Sleep(1 * time.Second) // exponential backoff with jitter in prod
 						continue
 					}
-					log.Println(status)
 					break
 				}
 
+				if retries == spec.RetryCount {
+					result = &GPUHealthResult{
+						NodeId:  job.CRD.NodeId,
+						Healthy: false,
+						Error:   lastError.Error(),
+					}
+				} else {
+					result = &GPUHealthResult{
+						NodeId:  job.CRD.NodeId,
+						Healthy: true,
+					}
+				}
+
+				job.Results <- result
 				cancel()
 			}
 			return nil
@@ -127,10 +154,12 @@ func main() {
 
 	spec := WorkerPoolSpec{workerCount, bufferSize, retryCount, g}
 	wp := NewWorkerPool(spec)
+	nodeCount := 10
+	results := make(chan *GPUHealthResult, nodeCount)
 
 	// producer (mock)
-	for i := range 10 {
-		job := Job[GPUHealthCheck]{
+	for i := range nodeCount {
+		job := Job{
 			Context: ctx,
 			CRD: GPUHealthCheck{
 				NodeId: fmt.Sprintf("gpu-%d", i*100),
@@ -138,6 +167,7 @@ func main() {
 				Region: "us-east-2",
 				Status: "NodeReady",
 			},
+			Results: results,
 		}
 		wp.SubmitJob(job)
 	}
@@ -145,11 +175,24 @@ func main() {
 	wp.Close()
 
 	// consumer (reconciliation) -> wait for all CRD instances to be reconciled
-	if err := g.Wait(); err != nil {
-		// export Prometheus error metric
-		log.Println(err)
-	}
+	go func() {
+		if err := g.Wait(); err != nil {
+			// export Prometheus error metric
+			log.Println(err)
+		}
+		close(results)
+	}()
 
+	// print JSON log
+	// created a sorted slice for deterministic output
+	for result := range results {
+		data, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			log.Fatalf("error marshaling result: %v", result)
+			continue
+		}
+		log.Println(string(data))
+	}
 }
 
 /*
