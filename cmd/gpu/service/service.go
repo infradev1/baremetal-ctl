@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 )
 
 // K8s CRD
@@ -63,6 +64,7 @@ type WorkerPoolSpec struct {
 	WorkerCount int
 	BufferSize  int
 	RetryCount  int
+	*rate.Limiter
 	*errgroup.Group
 }
 
@@ -91,7 +93,7 @@ func isDuplicate(id string) bool {
 	return loaded
 }
 
-func NewWorkerPool(spec WorkerPoolSpec, svc GPUService) *WorkerPool {
+func NewWorkerPool(spec *WorkerPoolSpec, svc GPUService) *WorkerPool {
 	workers := make([]*Worker, 0, spec.WorkerCount)
 
 	for i := range spec.WorkerCount {
@@ -103,6 +105,10 @@ func NewWorkerPool(spec WorkerPoolSpec, svc GPUService) *WorkerPool {
 		spec.Go(func() error {
 			// process job queue -> concurrent reconciliation (simulate)
 			for job := range worker.Queue { // must be closed by producer(s)
+				if err := spec.Limiter.Wait(job.Context); err != nil {
+					return fmt.Errorf("rate limit failed: %w", err) // Respects context cancellation
+				}
+
 				ctx, cancel := context.WithTimeout(job.Context, 5*time.Second)
 				retries := 0
 				var result *GPUHealthResult

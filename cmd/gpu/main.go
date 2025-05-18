@@ -14,6 +14,7 @@ import (
 	"baremetal-ctl/cmd/gpu/service"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 )
 
 // controller watching CRD
@@ -35,17 +36,18 @@ func main() {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(workerCount)
 
-	spec := service.WorkerPoolSpec{
+	spec := &service.WorkerPoolSpec{
 		WorkerCount: workerCount,
 		BufferSize:  bufferSize,
 		RetryCount:  retryCount,
+		Limiter:     rate.NewLimiter(rate.Every(100*time.Millisecond), 10),
 		Group:       g,
 	}
 	wp := service.NewWorkerPool(spec, &service.RPCSimulator{})
 	nodeCount := 10
 	results := make(chan *service.GPUHealthResult, nodeCount)
 
-	// producer (simulate)
+	// producer (simulate) - TODO: Load from JSON or text file
 	for i := range nodeCount {
 		nodeId := fmt.Sprintf("gpu-%d", i*100)
 		job := service.Job{
