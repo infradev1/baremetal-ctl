@@ -44,7 +44,7 @@ func main() {
 	nodeCount := 10
 	results := make(chan *service.GPUHealthResult, nodeCount)
 
-	// producer (mock)
+	// producer (simulate)
 	for i := range nodeCount {
 		job := service.Job{
 			Context: ctx,
