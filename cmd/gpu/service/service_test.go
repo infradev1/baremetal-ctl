@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 // table-driven tests
@@ -19,7 +21,8 @@ func TestCheckHealth(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := svc.CheckHealth(context.Background(), tt.nodeID) // non-deterministic as-is
+			requestID := uuid.New().String()
+			_, err := svc.CheckHealth(context.Background(), requestID, tt.nodeID) // non-deterministic as-is
 			if (err != nil) != tt.wantErr {
 				t.Errorf("unexpected error: %v", err)
 			}

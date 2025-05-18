@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"baremetal-ctl/cmd/gpu/service"
 
@@ -46,10 +47,12 @@ func main() {
 
 	// producer (simulate)
 	for i := range nodeCount {
+		nodeId := fmt.Sprintf("gpu-%d", i*100)
 		job := service.Job{
-			Context: ctx,
+			RequestID: fmt.Sprintf("%s-%d", nodeId, time.Now().Unix()), // Unique ID,
+			Context:   ctx,
 			CRD: service.GPUHealthCheck{
-				NodeId: fmt.Sprintf("gpu-%d", i*100),
+				NodeId: nodeId,
 				AZ:     "A",
 				Region: "us-east-2",
 				Status: "NodeReady",

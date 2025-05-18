@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -26,12 +28,12 @@ type GPUHealthResult struct {
 }
 
 type GPUService interface {
-	CheckHealth(ctx context.Context, nodeId string) (string, error)
+	CheckHealth(ctx context.Context, requestID, nodeId string) (string, error)
 }
 
 type RPCSimulator struct{}
 
-func (rpc *RPCSimulator) CheckHealth(ctx context.Context, nodeId string) (string, error) {
+func (rpc *RPCSimulator) CheckHealth(ctx context.Context, requestID, nodeId string) (string, error) {
 	select {
 	case <-ctx.Done():
 		return "", ctx.Err()
@@ -46,9 +48,10 @@ func (rpc *RPCSimulator) CheckHealth(ctx context.Context, nodeId string) (string
 
 // the provisioning process for a GPU includes applying this CRD
 type Job struct {
-	Context context.Context // timeout
-	CRD     GPUHealthCheck
-	Results chan<- *GPUHealthResult
+	RequestID string          // Unique ID for idempotency (e.g., hash of NodeId+Timestamp)
+	Context   context.Context // timeout
+	CRD       GPUHealthCheck
+	Results   chan<- *GPUHealthResult
 }
 
 type Worker struct {
@@ -67,16 +70,25 @@ type WorkerPool struct {
 	Workers []*Worker
 }
 
-func (wp *WorkerPool) SubmitJob(job Job) {
-	// in production, use round-robin load balancing or partition key hashing function like Kafka
-	i := rand.Intn(len(wp.Workers))
-	wp.Workers[i].Queue <- job
-}
-
 func (wp *WorkerPool) Close() {
 	for _, w := range wp.Workers {
 		close(w.Queue)
 	}
+}
+
+func (wp *WorkerPool) SubmitJob(job Job) {
+	if !isDuplicate(job.RequestID) { // Check cache/db
+		// in production, use round-robin load balancing or partition key hashing function like Kafka
+		i := rand.Intn(len(wp.Workers))
+		wp.Workers[i].Queue <- job
+	}
+}
+
+var processedIDs sync.Map // Thread-safe
+
+func isDuplicate(id string) bool {
+	_, loaded := processedIDs.LoadOrStore(id, true)
+	return loaded
 }
 
 func NewWorkerPool(spec WorkerPoolSpec, svc GPUService) *WorkerPool {
@@ -101,7 +113,8 @@ func NewWorkerPool(spec WorkerPoolSpec, svc GPUService) *WorkerPool {
 				// retry on failure
 				for retries < spec.RetryCount {
 					// pass context with timeout to rpc call(s)
-					if _, err := svc.CheckHealth(ctx, job.CRD.NodeId); err != nil {
+					requestID := uuid.New().String()
+					if _, err := svc.CheckHealth(ctx, requestID, job.CRD.NodeId); err != nil {
 						lastError = err // export to Prometheus in prod
 						retries++
 						time.Sleep(1 * time.Second) // exponential backoff with jitter in prod
