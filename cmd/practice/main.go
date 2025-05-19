@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+var nodesLastFirmwareRefreshes sync.Map
+
 type GPUFirmwareRequest struct {
 	NodeId    string
 	NodePool  string // extensible by adding additional "filter" fields
@@ -20,9 +22,10 @@ type GPUFirmwareRequest struct {
 }
 
 type GPUFirmwareResponse struct {
-	NodeId  string `json:"nodeId"`
-	Version string `json:"version"`
-	Status  string `json:"status"`
+	NodeId            string    `json:"nodeId"`
+	Version           string    `json:"version"`
+	Status            string    `json:"status"` // Healthy, Stale, Error
+	LastRefreshedTime time.Time `json:"lastRefreshedTime"`
 }
 
 type GPUFirmwareChecker interface {
@@ -32,14 +35,31 @@ type GPUFirmwareChecker interface {
 type FirmwareService struct{}
 
 func (fs *FirmwareService) GetFirmwareVersion(ctx context.Context, req *GPUFirmwareRequest) (*GPUFirmwareResponse, error) {
+	t, _ := nodesLastFirmwareRefreshes.Load(req.NodeId)
+	var lastRefresh time.Time = t.(time.Time)
+	//t = t.(time.Time)
+	status := "Error (RPC failure or timeout)"
+
+	if time.Since(lastRefresh) > stalenessDuration {
+		status = "Warning (stale firmware data)"
+	} else {
+		status = "Healthy (fresh firmware version)"
+	}
+
 	select {
 	case <-ctx.Done():
-		return &GPUFirmwareResponse{req.NodeId, "", "request cancelled before verification"}, ctx.Err()
+		return &GPUFirmwareResponse{
+			NodeId:            req.NodeId,
+			Version:           "",
+			Status:            status,
+			LastRefreshedTime: lastRefresh,
+		}, ctx.Err()
 	default:
 		return &GPUFirmwareResponse{
-			NodeId:  req.NodeId,
-			Version: "v1.0.0",
-			Status:  "firmware version obtained successfully",
+			NodeId:            req.NodeId,
+			Version:           "v1.0.0",
+			Status:            status,
+			LastRefreshedTime: lastRefresh,
 		}, nil
 	}
 }
@@ -135,7 +155,10 @@ func NewWorkerPool(spec *WorkerPoolSpec) *WorkerPool {
 	}
 }
 
-const total = 5
+const (
+	total             = 5
+	stalenessDuration = 1 * time.Minute
+)
 
 func main() {
 	var workerCount int
@@ -175,6 +198,7 @@ func main() {
 		defer close(errors)
 
 		for i := range total {
+			nodesLastFirmwareRefreshes.Store(fmt.Sprintf("gpu-%d", i), time.Now())
 			wg.Add(1)
 			wp.SubmitJob(&Job{
 				Id:      i,
