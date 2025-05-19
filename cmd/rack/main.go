@@ -49,7 +49,7 @@ func NewWorkerPool(ctx context.Context, results chan<- Result, wg *sync.WaitGrou
 				// capture results channel
 				// set up context with deadline for the job (simulate gRPC call)
 				// due to time constraints, simply echo job message
-				results <- Result{job.Message}
+				results <- Result{fmt.Sprintf("%s from (%s, %s)", job.Message, job.NodeId, worker.Id)}
 				wg.Done()
 			}
 		}()
@@ -92,6 +92,7 @@ func NewNode(nodeId string, ctx context.Context, results chan Result, wg *sync.W
 
 type Job struct {
 	Message string
+	NodeId  string
 }
 
 // Build a Go CLI tool that assigns jobs to nodes in a rack without exceeding the rack-wide power budget.
@@ -148,7 +149,9 @@ func main() {
 				lastSubmitted = 0
 			}
 			wg.Add(1)
-			nodes[lastSubmitted].SubmitJob(&Job{fmt.Sprintf("message number %d", i)}) // for simplicity
+			nodes[lastSubmitted].SubmitJob(&Job{
+				fmt.Sprintf("message number %d", i), nodes[lastSubmitted].Id,
+			}) // for simplicity
 			totalPower += jobPower
 			lastSubmitted++
 		}
