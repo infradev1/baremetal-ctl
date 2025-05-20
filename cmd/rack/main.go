@@ -1,6 +1,7 @@
 package main
 
 import (
+	"baremetal-ctl/cmd/rack/internal"
 	"context"
 	"encoding/json"
 	"flag"
@@ -21,80 +22,6 @@ const (
 	defaultNodePower = 200
 )
 
-type Result struct {
-	Message string `json:"message"`
-}
-
-type Worker struct {
-	Id    string
-	Queue chan *Job
-}
-
-type WorkerPool struct {
-	Workers []*Worker
-}
-
-// replace parameter list with WorkerPoolSpec for maintainability and extensibility
-func NewWorkerPool(ctx context.Context, results chan<- Result, wg *sync.WaitGroup, workerCount, bufferSize int) *WorkerPool {
-	workers := make([]*Worker, 0, workerCount)
-	for i := range workerCount {
-		worker := &Worker{
-			Id:    fmt.Sprintf("worker-%d", i),
-			Queue: make(chan *Job),
-		}
-		workers = append(workers, worker)
-
-		go func() {
-			for job := range worker.Queue {
-				// capture results channel
-				// set up context with deadline for the job (simulate gRPC call)
-				// due to time constraints, simply echo job message
-				results <- Result{fmt.Sprintf("%s from (%s, %s)", job.Message, job.NodeId, worker.Id)}
-				wg.Done()
-			}
-		}()
-	}
-	return &WorkerPool{Workers: workers}
-}
-
-type Node struct {
-	Id                  string
-	PowerUsage          int         // Watts
-	Capacity            int         // Watts
-	Assigned            int         // initially zero
-	Pool                *WorkerPool // simulate daemonset (1 replica per node in the rack)
-	LastSubmittedWorker int
-}
-
-func (n *Node) SubmitJob(job *Job) {
-	if n.PowerUsage > n.Capacity {
-		log.Fatal("exceeded node power capacity") // TODO: graceful handling, if time allows
-	}
-	// round-robin load balancing within the node as well
-	if n.LastSubmittedWorker >= len(n.Pool.Workers) {
-		n.LastSubmittedWorker = 0
-	}
-	n.Pool.Workers[n.LastSubmittedWorker].Queue <- job
-	n.PowerUsage += jobPower
-	n.LastSubmittedWorker++
-}
-
-// replace parameter list with NodeSpec for maintainability and extensibility
-func NewNode(nodeId string, ctx context.Context, results chan Result, wg *sync.WaitGroup, workerCount, bufferSize int) *Node {
-	return &Node{
-		Id:         nodeId,
-		PowerUsage: defaultNodePower,
-		Capacity:   nodeCapacity, // could also be a CLI flag
-		Assigned:   0,
-		Pool:       NewWorkerPool(ctx, results, wg, workerCount, bufferSize),
-	}
-}
-
-type Job struct {
-	Message string
-	NodeId  string
-}
-
 // Build a Go CLI tool that assigns jobs to nodes in a rack without exceeding the rack-wide power budget.
 // Assign jobs to nodes such that:
 // No node exceeds its Capacity
@@ -109,51 +36,36 @@ func main() {
 
 	flag.Parse()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
 	wg := &sync.WaitGroup{}
 
 	totalPower := 0
 	// simulate input (list of nodes in a rack)
-	nodes := make([]*Node, 0, nodeCount)
-	results := make(chan Result)
+	nodes := make([]*internal.Node, 0, nodeCount)
+	results := make(chan internal.Result)
 
 	for i := range nodeCount {
 		if totalPower > rackPowerBudget {
 			log.Fatal("exceeded rack power budget")
 		}
-		nodes = append(nodes, NewNode(
-			fmt.Sprintf("node-%d", i),
-			ctx,
-			results,
-			wg,
-			maxConcurrency,
-			bufferSize,
-		))
+		node := &internal.Node{
+			Id:         fmt.Sprintf("node-%d", i),
+			PowerUsage: defaultNodePower,
+			Capacity:   nodeCapacity, // could also be a CLI flag
+			Assigned:   0,
+			Pool:       internal.NewWorkerPool(ctx, results, wg, maxConcurrency, bufferSize),
+		}
+		nodes = append(nodes, node)
 		totalPower += defaultNodePower
 	}
 
 	go func() {
 		defer close(results)
-		lastSubmitted := 0
 		// simulate job submission
-		for i := range jobCount {
-			// ensure we do not exceed total rack power (block until jobs finish rather than log fatal, if time allows)
-			if totalPower > rackPowerBudget {
-				log.Fatal("exceeded rack power budget with job submission")
-			}
-
-			// submit round-robin
-			if lastSubmitted >= len(nodes) {
-				lastSubmitted = 0
-			}
-			wg.Add(1)
-			nodes[lastSubmitted].SubmitJob(&Job{
-				fmt.Sprintf("message number %d", i), nodes[lastSubmitted].Id,
-			}) // for simplicity
-			totalPower += jobPower
-			lastSubmitted++
+		if err := internal.SubmitJobs(nodes, wg, jobCount, jobPower, rackPowerBudget, &totalPower); err != nil {
+			log.Fatal(err)
 		}
 		wg.Wait()
 	}()
