@@ -42,6 +42,7 @@ func main() {
 	results := make(chan internal.Result)
 
 	// simulate input (list of nodes in a rack)
+	// TODO: NodePool struct
 	nodes, err := internal.CreateNodes(ctx, wg, totalPower, results, nodeCount, defaultNodePower, nodeCapacity, rackPowerBudget, maxConcurrency, bufferSize)
 	if err != nil {
 		log.Fatal(err)

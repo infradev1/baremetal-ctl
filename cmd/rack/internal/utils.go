@@ -8,7 +8,7 @@ import (
 )
 
 // replace parameter list with WorkerPoolSpec for maintainability and extensibility
-func NewWorkerPool(ctx context.Context, results chan<- Result, wg *sync.WaitGroup, workerCount, bufferSize int) *WorkerPool {
+func NewWorkerPool(ctx context.Context, results chan<- Result, wg *sync.WaitGroup, workerCount, bufferSize int, totalPower *RackPower) *WorkerPool {
 	workers := make([]*Worker, 0, workerCount)
 	for i := range workerCount {
 		worker := &Worker{
@@ -24,6 +24,8 @@ func NewWorkerPool(ctx context.Context, results chan<- Result, wg *sync.WaitGrou
 				// due to time constraints, simply echo job message
 				results <- Result{fmt.Sprintf("%s from (%s, %s)", job.Message, job.NodeId, worker.Id)}
 				wg.Done()
+				// decrement total rack power
+				totalPower.Add(-job.Power)
 			}
 		}()
 	}
@@ -44,7 +46,7 @@ func CreateNodes(ctx context.Context, wg *sync.WaitGroup, totalPower *RackPower,
 			PowerUsage: defaultNodePower,
 			Capacity:   nodeCapacity, // could also be a CLI flag
 			Assigned:   0,
-			Pool:       NewWorkerPool(ctx, results, wg, maxConcurrency, bufferSize),
+			Pool:       NewWorkerPool(ctx, results, wg, maxConcurrency, bufferSize, totalPower),
 		}
 		nodes = append(nodes, node)
 		totalPower.Add(defaultNodePower)
