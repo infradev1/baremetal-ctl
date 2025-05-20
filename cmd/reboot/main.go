@@ -20,7 +20,7 @@ type Node struct {
 
 type RebootResult struct {
 	NodeId int    `json:"nodeId"`
-	Status string `json:"status"`
+	Status string `json:"status"` // TODO: replace with enum
 	Error  string `json:"error,omitempty"`
 }
 
@@ -35,7 +35,7 @@ func (c *Client) Reboot(ctx context.Context, node *Node) *RebootResult {
 	// if time allows, simulate all 3 result modes
 	return &RebootResult{
 		NodeId: node.Id,
-		Status: "Reboot successful",
+		Status: "success",
 		Error:  "",
 	}
 }
@@ -115,13 +115,30 @@ func NewWorkerPool(spec *WorkerPoolSpec) *WorkerPool {
 				if inProgress := spec.Activity.Get(node.AZ); inProgress < 2 {
 					spec.WaitGroup.Add(1)
 					spec.Activity.Add(node.AZ, 1)
-
 					ctx, cancel := context.WithTimeout(spec.Context, 10*time.Second)
-					// implement retry logic if time allows
-					// also check for <-ctx.Done()
-					result := spec.Service.Reboot(ctx, node)
-					spec.Results <- result
+					done := false
 
+					for attempt := 0; attempt <= spec.Retries && !done; attempt++ {
+						select {
+						case <-ctx.Done():
+							spec.Results <- &RebootResult{
+								NodeId: node.Id,
+								Status: "timeout",
+								Error:  ctx.Err().Error(),
+							}
+							done = true
+						default:
+							result := spec.Service.Reboot(ctx, node)
+							if result.Status == "success" {
+								spec.Results <- result
+								done = true
+							} else {
+								time.Sleep(1 * time.Second) // TODO: exponential backoff with jitter
+								continue
+							}
+
+						}
+					}
 					cancel()
 					spec.Activity.Add(node.AZ, -1)
 					spec.WaitGroup.Done()
@@ -199,11 +216,16 @@ func main() {
 		wg.Wait()
 	}()
 
+	total := 0
+
 	for result := range results {
 		data, err := json.MarshalIndent(result, "", "  ")
 		if err != nil {
 			log.Println(err)
 		}
 		log.Println(string(data))
+		total++
 	}
+
+	log.Println(total)
 }
