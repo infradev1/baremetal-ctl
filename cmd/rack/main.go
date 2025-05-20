@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -38,33 +37,20 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-
 	wg := &sync.WaitGroup{}
-
-	totalPower := 0
-	// simulate input (list of nodes in a rack)
-	nodes := make([]*internal.Node, 0, nodeCount)
+	totalPower := &internal.RackPower{}
 	results := make(chan internal.Result)
 
-	for i := range nodeCount {
-		if totalPower > rackPowerBudget {
-			log.Fatal("exceeded rack power budget")
-		}
-		node := &internal.Node{
-			Id:         fmt.Sprintf("node-%d", i),
-			PowerUsage: defaultNodePower,
-			Capacity:   nodeCapacity, // could also be a CLI flag
-			Assigned:   0,
-			Pool:       internal.NewWorkerPool(ctx, results, wg, maxConcurrency, bufferSize),
-		}
-		nodes = append(nodes, node)
-		totalPower += defaultNodePower
+	// simulate input (list of nodes in a rack)
+	nodes, err := internal.CreateNodes(ctx, wg, totalPower, results, nodeCount, defaultNodePower, nodeCapacity, rackPowerBudget, maxConcurrency, bufferSize)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	go func() {
 		defer close(results)
 		// simulate job submission
-		if err := internal.SubmitJobs(nodes, wg, jobCount, jobPower, rackPowerBudget, &totalPower); err != nil {
+		if err := internal.SubmitJobs(nodes, wg, jobCount, jobPower, rackPowerBudget, totalPower); err != nil {
 			log.Fatal(err)
 		}
 		wg.Wait()

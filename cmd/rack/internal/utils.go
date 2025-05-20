@@ -30,27 +30,49 @@ func NewWorkerPool(ctx context.Context, results chan<- Result, wg *sync.WaitGrou
 	return &WorkerPool{Workers: workers}
 }
 
-func SubmitJobs(nodes []*Node, wg *sync.WaitGroup, jobCount, jobPower, rackPowerBudget int, totalPower *int) error {
+// TODO: Pass NodeSpec and WorkerPoolSpec structs
+func CreateNodes(ctx context.Context, wg *sync.WaitGroup, totalPower *RackPower, results chan<- Result,
+	nodeCount, defaultNodePower, nodeCapacity, rackPowerBudget, maxConcurrency, bufferSize int,
+) ([]*Node, error) {
+	nodes := make([]*Node, 0, nodeCount)
+	for i := range nodeCount {
+		if totalPower.Get() > rackPowerBudget {
+			return nil, errors.New("exceeded rack power budget")
+		}
+		node := &Node{
+			Id:         fmt.Sprintf("node-%d", i),
+			PowerUsage: defaultNodePower,
+			Capacity:   nodeCapacity, // could also be a CLI flag
+			Assigned:   0,
+			Pool:       NewWorkerPool(ctx, results, wg, maxConcurrency, bufferSize),
+		}
+		nodes = append(nodes, node)
+		totalPower.Add(defaultNodePower)
+	}
+	return nodes, nil
+}
+
+func SubmitJobs(nodes []*Node, wg *sync.WaitGroup, jobCount, jobPower, rackPowerBudget int, totalPower *RackPower) error {
 	lastSubmitted := 0
 	// simulate job submission
 	for i := range jobCount {
 		// ensure we do not exceed total rack power (block until jobs finish rather than log fatal, if time allows)
-		if *totalPower > rackPowerBudget {
+		currentTotal := totalPower.Get()
+		if currentTotal+jobPower > rackPowerBudget {
 			return errors.New("exceeded rack power budget with job submission")
 		}
-
 		// submit round-robin
 		if lastSubmitted >= len(nodes) {
 			lastSubmitted = 0
 		}
-		wg.Add(1)
 		nodes[lastSubmitted].SubmitJob(&Job{
 			Message: fmt.Sprintf("message number %d", i),
 			NodeId:  nodes[lastSubmitted].Id,
 			Power:   jobPower,
 		}) // for simplicity
-		*totalPower += jobPower
+		totalPower.Add(jobPower)
 		lastSubmitted++
+		wg.Add(1)
 	}
 	return nil
 }
