@@ -54,6 +54,9 @@ func main() {
 			log.Fatal(err)
 		}
 		wg.Wait()
+		for _, node := range nodes {
+			node.Pool.Close()
+		}
 	}()
 
 	// log results from channel in JSON format, if time allows

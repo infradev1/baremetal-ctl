@@ -35,6 +35,12 @@ type WorkerPool struct {
 	Workers []*Worker
 }
 
+func (wp *WorkerPool) Close() {
+	for _, worker := range wp.Workers {
+		close(worker.Queue)
+	}
+}
+
 type Node struct {
 	Id                  string
 	PowerUsage          int         // Watts
