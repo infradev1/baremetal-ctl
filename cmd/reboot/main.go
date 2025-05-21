@@ -111,9 +111,10 @@ func NewWorkerPool(spec *WorkerPoolSpec) *WorkerPool {
 
 		go func() {
 			for node := range worker.Queue {
+				spec.WaitGroup.Add(1)
+
 				// consider redesign to have 1 worker per AZ
 				if inProgress := spec.Activity.Get(node.AZ); inProgress < 2 {
-					spec.WaitGroup.Add(1)
 					spec.Activity.Add(node.AZ, 1)
 					ctx, cancel := context.WithTimeout(spec.Context, 10*time.Second)
 					done := false
