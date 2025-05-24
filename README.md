@@ -76,6 +76,7 @@ I built this project to simulate the type of internal infrastructure platforms u
 ## Next Steps
 
 - Add REST microservices with client-side error-handling to simulate real distributed systems
+- Real-time interaction with multiple microservices
 - Integration with libvirt or kubevirt for local VM provisioning
 - Expand CRD to support GPU scheduling, labels, taints
 - Cost-effective multi-cloud vendor support (i.e. Karpenter-based EKS Auto with EC2 Spot node group)
